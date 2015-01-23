@@ -14,7 +14,7 @@ function updatePage(target) {
   updatePage($('.sidebar .link.active').data('target'));
 
   $(document).on('click', '.data-table tbody td', function () {
-    $('.data-table tbody td').removeClass('selected');
-    $(this).addClass('selected');
+    $('.data-table tbody tr').removeClass('selected');
+    $(this).parent().addClass('selected');
   });
 })($);
