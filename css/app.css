@@ -1,0 +1,229 @@
+/* Structure */
+/* Colours */
+/* Common properties */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-weight: 200; }
+
+ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0; }
+
+button {
+  outline: 0;
+  border: none;
+  background: none; }
+
+.container {
+  height: 100%;
+  width: 100%;
+  padding: 56px 0 48px 0;
+  top: 0;
+  box-sizing: border-box;
+  position: absolute; }
+
+.page {
+  height: 100%;
+  margin-left: 250px;
+  border-sizing: border-box;
+  overflow-y: scroll; }
+
+/* Structure */
+/* Colours */
+/* Common properties */
+.header {
+  width: 100%;
+  height: 56px;
+  line-height: 56px;
+  font-size: 14px;
+  background-color: #5A6B77;
+  border-bottom: 1px solid #475762;
+  z-index: 1;
+  position: absolute;
+  overflow: hidden;
+  color: white; }
+
+.header .logo {
+  float: left;
+  width: 102px;
+  height: 32px;
+  margin: 12px;
+  background-image: url("../img/logo.svg"); }
+
+.header .user {
+  float: right;
+  margin: 0 12px; }
+
+.header .user .name {
+  font-weight: bold; }
+
+/* Structure */
+/* Colours */
+/* Common properties */
+.sidebar {
+  width: 250px;
+  height: 100%;
+  box-sizing: border-box;
+  border-right: 1px solid #475762;
+  float: left;
+  position: relative;
+  background-color: #6D808E; }
+
+.sidebar .link {
+  cursor: pointer;
+  color: white;
+  font-size: 16px;
+  padding: 12px; }
+
+.sidebar .link.active {
+  background-color: #5298FC; }
+
+/* Structure */
+/* Colours */
+/* Common properties */
+.footer {
+  width: 100%;
+  height: 48px;
+  line-height: 48px;
+  background-color: #5A6B77;
+  border-top: 1px solid #475762;
+  position: absolute;
+  bottom: 0;
+  font-size: 14px;
+  color: white; }
+
+.footer .links {
+  margin-right: 12px;
+  float: right;
+  overflow: hidden; }
+
+.footer .links .link {
+  float: left; }
+
+.footer .links .link a {
+  text-decoration: none;
+  color: white;
+  margin-left: 12px; }
+
+/* Structure */
+/* Colours */
+/* Common properties */
+.data-table {
+  border-collapse: collapse;
+  color: #4E4E4E;
+  width: 100%; }
+
+.data-table thead {
+  background-color: #F4F8FC;
+  font-size: 14px;
+  font-weight: bold;
+  border-bottom: 1px solid #C0C0C0; }
+
+.data-table thead td {
+  border-right: 1px solid #C0C0C0; }
+
+.data-table tbody {
+  font-size: 12px; }
+
+.data-table td {
+  padding: 8px;
+  min-width: 120px; }
+
+.data-table tbody tr {
+  border-bottom: 1px solid #C0C0C0; }
+
+.data-table tbody tr:nth-child(2n) {
+  background-color: #F3F3F3; }
+
+.data-table tbody td {
+  border-right: 1px dotted #C0C0C0; }
+
+.data-table .selected {
+  position: relative;
+  box-shadow: 0px 0px 5px #5298FC; }
+
+.data-table-control {
+  background-color: #F3F3F3;
+  border-bottom: 1px solid #C0C0C0;
+  padding: 12px;
+  overflow: hidden;
+  text-align: right; }
+
+.data-table-control .filter-controls {
+  float: left; }
+
+.data-table-control .download-controls {
+  float: right; }
+
+.data-table-control .control {
+  padding: 8px;
+  border-radius: 4px;
+  background-color: white;
+  color: #5298FC;
+  font-size: 14px;
+  border: 1px solid #5298FC;
+  cursor: pointer; }
+
+.empty-wrapper {
+  height: 100%;
+  text-align: center; }
+
+.empty-inner-wrapper {
+  position: relative;
+  top: 50%;
+  height: 1px;
+  margin: 0 auto;
+  margin-top: -80px;
+  width: 250px; }
+
+.empty-image {
+  position: relative;
+  margin-left: 65px; }
+
+.empty-users {
+  background-image: url("../img/users-big.svg");
+  height: 112px;
+  width: 120px; }
+
+.empty-forms {
+  background-image: url("../img/forms-big.svg");
+  height: 107px;
+  width: 120px; }
+
+.empty-label {
+  margin-top: 16px; }
+
+.icon {
+  top: 2px;
+  width: 10px;
+  display: block;
+  width: 22px;
+  height: 16px;
+  margin-top: 1px;
+  margin-right: 6px;
+  background-repeat: no-repeat;
+  background-position: center;
+  float: left; }
+
+/* Sidebar icons */
+.icon.icon-users {
+  background-image: url("../img/users.svg"); }
+
+.icon.icon-forms {
+  background-image: url("../img/forms.svg"); }
+
+/* Button icons */
+.icon.icon-download {
+  background-image: url("../img/download.svg"); }
+
+.icon.icon-download-updated {
+  background-image: url("../img/download-updated.svg"); }
+
+.icon.icon-filter {
+  background-image: url("../img/filter.svg"); }
+
+/*# sourceMappingURL=app.css.map */
