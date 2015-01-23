@@ -1,0 +1,74 @@
+@import 'base';
+
+$table-font-color: #4E4E4E;
+$table-header-background: #F4F8FC;
+$table-border: 1px solid $medium-grey;
+
+.data-table {
+  border-collapse: collapse;
+  color: $table-font-color;
+  width: 100%;
+}
+
+.data-table thead {
+  background-color: $table-header-background;
+  font-size: 14px;
+  font-weight: bold;
+  border-bottom: $table-border;
+}
+
+.data-table thead td {
+  border-right: $table-border;
+}
+
+.data-table tbody {
+  font-size: 12px;
+}
+
+.data-table td {
+  padding: 8px;
+  min-width: 120px;
+}
+
+.data-table tbody tr {
+  border-bottom: $table-border;
+}
+
+.data-table tbody tr:nth-child(2n) {
+  background-color: $light-grey;
+}
+
+.data-table tbody td {
+  border-right: 1px dotted $medium-grey;
+}
+
+.data-table .selected {
+  position: relative;
+  box-shadow: 0px 0px 5px $bright-blue;
+}
+
+.data-table-control {
+  background-color: $light-grey;
+  border-bottom: $table-border;
+  padding: 12px;
+  overflow: hidden;
+  text-align: right;
+}
+
+.data-table-control .filter-controls {
+  float: left;
+}
+
+.data-table-control .download-controls {
+  float: right;
+}
+
+.data-table-control .control {
+  padding: 8px;
+  border-radius: 4px;
+  background-color: white;
+  color: $bright-blue;
+  font-size: 14px;
+  border: 1px solid $bright-blue;
+  cursor: pointer;
+}

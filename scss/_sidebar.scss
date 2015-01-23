@@ -1,0 +1,22 @@
+@import 'base';
+
+.sidebar {
+  width: $sidebar-width;
+  height: 100%;
+  box-sizing: border-box;
+  border-right: $separator;
+  float: left;
+  position: relative;
+  background-color: $light-blue;
+}
+
+.sidebar .link {
+  cursor: pointer;
+  color: white;
+  font-size: 16px;
+  padding: 12px;
+}
+
+.sidebar .link.active {
+  background-color: $bright-blue;
+}

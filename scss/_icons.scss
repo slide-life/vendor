@@ -1,0 +1,36 @@
+.icon {
+  top: 2px;
+  width: 10px;
+  display: block;
+  width: 22px;
+  height: 16px;
+  margin-top: 1px;
+  margin-right: 6px;
+  background-repeat: no-repeat;
+  background-position: center;
+  float: left;
+}
+
+/* Sidebar icons */
+
+.icon.icon-users {
+  background-image: url('../img/users.svg');
+}
+
+.icon.icon-forms {
+  background-image: url('../img/forms.svg');
+}
+
+/* Button icons */
+
+.icon.icon-download {
+  background-image: url('../img/download.svg');
+}
+
+.icon.icon-download-updated {
+  background-image: url('../img/download-updated.svg');
+}
+
+.icon.icon-filter {
+  background-image: url('../img/filter.svg');
+}

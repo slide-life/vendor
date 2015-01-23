@@ -1,0 +1,29 @@
+@import 'base';
+
+.footer {
+  width: 100%;
+  height: $footer-height;
+  line-height: $footer-height;
+  background-color: $medium-blue;
+  border-top: $separator;
+  position: absolute;
+  bottom: 0;
+  font-size: 14px;
+  color: white;
+}
+
+.footer .links {
+  margin-right: 12px;
+  float: right;
+  overflow: hidden;
+}
+
+.footer .links .link {
+  float: left;
+}
+
+.footer .links .link a {
+  text-decoration: none;
+  color: white;
+  margin-left: 12px;
+}

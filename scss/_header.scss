@@ -1,0 +1,31 @@
+@import 'base';
+
+.header {
+  width: 100%;
+  height: $header-height;
+  line-height: $header-height;
+  font-size: 14px;
+  background-color: $medium-blue;
+  border-bottom: $separator;
+  z-index: 1;
+  position: absolute;
+  overflow: hidden;
+  color: white;
+}
+
+.header .logo {
+  float: left;
+  width: 102px;
+  height: 32px;
+  margin: 12px;
+  background-image: url('../img/logo.svg');
+}
+
+.header .user {
+  float: right;
+  margin: 0 12px;
+}
+
+.header .user .name {
+  font-weight: bold;
+}
