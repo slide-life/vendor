@@ -38,7 +38,8 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 (function($) {
   var SlideVendor = function () {
     this.data = { forms: FIXTURE_FORMS };
-    this.$page = $('.page');
+    this.$container = $('.container');
+    this.$page = $('.container').find('.page');
     this.templates = SlideVendorTemplates;
 
     this.initializeListeners();
@@ -74,7 +75,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 
   SlideVendor.prototype.initializeSidebarListeners = function () {
     var self = this;
-    this.$page.find('.sidebar .link').on('click', function () {
+    this.$container.find('.sidebar .link').on('click', function () {
       var target = $(this).data('target');
       $(this).siblings().removeClass('active');
       $(this).addClass('active');
