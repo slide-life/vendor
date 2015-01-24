@@ -1,0 +1,17 @@
+{
+  "name": "vendor",
+  "version": "0.0.0",
+  "homepage": "https://github.com/slide-life/vendor",
+  "description": "Vendor portal for viewing forms",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.3",
+    "slide.js": "git@github.com:slide-life/slide.js",
+    "handlebars": "~2.0.0"
+  }
+}
