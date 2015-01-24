@@ -1,0 +1,269 @@
+@import 'open-sans/open-sans.scss';
+@import '../bower_components/slick-carousel/slick/slick.scss';
+
+$light-grey:  #F3F3F3;
+$medium-grey: #C0C0C0;
+$dark-grey:   #1C1C1C;
+
+$light-green: #22C064;
+
+$field-height: 58px;
+$field-radius: 4px;
+$field-padding: 12px;
+$field-vertical-margin: 12px;
+$field-horizontal-margin: 12px;
+$field-label-width: 50%;
+$field-border: 1px solid $medium-grey;
+
+$add-button-size: 24px;
+
+$drop-shadow: 0px 2px 4px 0px rgba(160, 160, 160, 0.40);
+
+*:not(input, textarea) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.slide-form, .slide-form ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.slide-form {
+  font-family: 'Open Sans';
+  font-size: 12px;
+  background-color: $light-grey;
+  list-style-type: none;
+  margin: 0;
+  padding: $field-vertical-margin 0 0 0;
+  padding-top: 0;
+  overflow: hidden;
+}
+
+/* Field groups */
+
+.slide-form .field-group {
+  margin-top: $field-vertical-margin;
+}
+
+.slide-form .field-group .field {
+  font-weight: 600;
+  background-color: white;
+  height: $field-height;
+  line-height: $field-height;
+  border: $field-border;
+  border-bottom: none;
+}
+
+.slide-form .field-group .field-label-wrapper {
+  float: left;
+  width: $field-label-width;
+  padding: 0 $field-padding;
+  box-sizing: border-box;
+}
+
+.slide-form .field-group .field-input-wrapper {
+  float: right;
+  width: 100% - $field-label-width;
+  padding: 0 $field-padding;
+  box-sizing: border-box;
+  text-align: right;
+}
+
+.slide-form .field-group .field-input {
+  font-family: 'Open Sans';
+  color: $medium-grey;
+  font-size: 12px;
+  font-weight: 600;
+  background: none;
+  width: 100%;
+  text-align: right;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+   -webkit-tap-highlight-color: rgba(0,0,0,0);
+}
+
+.slide-form .send-button {
+  background-color: $light-green;
+  color: white;
+  width: 100%;
+  margin-top: $field-vertical-margin;
+  text-align: center;
+  height: $field-height;
+  line-height: $field-height;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Compound */
+
+.slide-form .compound-wrapper li:first-child .field {
+  border-top-left-radius: $field-radius;
+  border-top-right-radius: $field-radius;
+}
+
+.slide-form .compound-wrapper li:last-child .field {
+  border-bottom-left-radius: $field-radius;
+  border-bottom-right-radius: $field-radius;
+  border-bottom: $field-border;
+}
+
+/* Cards */
+
+.slide-form .card-wrapper .card-header {
+  z-index: 1;
+  position: relative;
+}
+
+.slide-form .card-wrapper .card-header .field {
+  border-bottom: $field-border;
+  box-shadow: $drop-shadow;
+}
+
+.slide-form .card-wrapper .card-header .field {
+  border-radius: $field-radius;
+}
+
+.slide-form .card-wrapper .card-subfields {
+  margin-top: 0;
+  display: none;
+  position: relative;
+  top: -$field-radius;
+}
+
+.slide-form .card-wrapper .card-subfields .field:first-child {
+  border-top: none;
+}
+
+.slide-form .card-wrapper .card-subfields .field:last-child {
+  border-bottom-left-radius: $field-radius;
+  border-bottom-right-radius: $field-radius;
+  border-bottom: $field-border;
+}
+
+.slide-form .new-field {
+  position: relative;
+}
+
+.slide-form .field-group .field.new-field {
+  border: none;
+}
+
+.slide-form .new-field .card-header .field {
+  box-shadow: none;
+}
+
+.slide-form .new-field .add-button-wrapper {
+  position: absolute;
+  z-index: 2;
+  height: 100%;
+  top: 0;
+  width: 100%;
+  background-color: $light-grey;
+}
+
+.slide-form .new-field .add-button-inner-wrapper {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 1px;
+  margin: 1px;
+}
+
+.slide-form .new-field .add-button {
+  margin-top: -($add-button-size / 2);
+  margin-left: -($add-button-size / 2);
+  background-color: $light-green;
+  border: $field-border;
+  color: white;
+  cursor: pointer;
+  text-align: center;
+  line-height: $add-button-size;
+  width: $add-button-size;
+  height: $add-button-size;
+  border-radius: $add-button-size / 2;
+}
+
+/* Modal */
+
+.slide-modal {
+  display: none;
+  width: 480px;
+  overflow: hidden;
+  margin: 60px auto;
+  border: $field-border;
+  box-shadow: 0px 0px 20px 2px rgba(80, 80, 80, 0.3);
+  border-radius: 8px;
+}
+
+.slide-modal-header {
+  background-color: $light-grey;
+  padding: 18px;
+  height: 40px;
+  border-bottom: $field-border;
+  position: relative;
+}
+
+.slide-modal-header .slide-logo {
+  width: 55px;
+  height: 40px;
+  margin: 0 auto;
+  background-image: url('../img/logo.jpg');
+}
+
+.slide-modal-action {
+  position: absolute;
+  top: 0;
+}
+
+.slide-modal-action a {
+  color: #333;
+  text-decoration: none;
+  line-height: 80px;
+}
+
+.slide-moda-action a:hover {
+  background: #ccc;
+}
+
+/* Passphrase modal */
+
+.passphrase-wrapper {
+  font-family: 'Open Sans';
+  font-size: 12px;
+  padding: 12px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.passphrase-wrapper input {
+  margin: 0 12px;
+}
+
+/* Slick styling */
+
+.slick-slide {
+  margin: 0 $field-horizontal-margin;
+}
+
+/* Modal form portal list */
+.form-list {
+  font-family: 'Helvetica Neue', sans-serif;
+  list-style: none;
+  padding: 0;
+}
+
+.form-list li {
+  width: 50%;
+  float: left;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  pointer: cursor;
+  text-align: center;
+}
+.form-list li:hover {
+  background: $light-grey;
+}
