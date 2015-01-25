@@ -1,3 +1,4 @@
+import Crypto from './utils/crypto';
 import Actor from './models/actor';
 import Conversation from './models/conversation';
 import User from './models/user';
@@ -18,6 +19,7 @@ var Slide = {
   VendorUser: VendorUser,
   Block: Block,
   Form: Form,
+  Crypto: Crypto,
 
   extractBlocks: function (form) {
     return form.find('*').map(function () {
@@ -64,7 +66,7 @@ var Slide = {
   insertVendorForm: function(form, vendor, onClick) {
     var modal = this.prepareModal('Your Forms');
     var list = modal.find('.form-list');
-    var li = $("<li></li>");
+    var li = $('<li></li>');
     li.click(function(evt) {
       onClick(form);
     });
@@ -75,7 +77,7 @@ var Slide = {
   presentVendorForms: function(forms, vendor, onCreate, onClick) {
     var modal = this.prepareModal('Your Forms');
     modal.toggle();
-    var list = $("<ul class='form-list'></ul>");
+    var list = $('<ul class="form-list"></ul>');
     modal.append(list);
     var addBtn = $('<a href="#">Add</a>');
     modal.find('.slide-modal-action').append(addBtn);
@@ -84,28 +86,28 @@ var Slide = {
       onCreate();
     });
     forms.forEach(function(form) {
-      var li = $("<li></li>");
+      var li = $('<li></li>');
       li.click(function(evt) {
         onClick(form);
       });
       li.text(form.name);
       list.append(li);
-    })
+    });
   },
 
   presentFormsModal: function(forms, user, cb) {
     var modal = this.prepareModal('Your Forms');
     modal.toggle();
-    var list = $("<ul class='form-list'></ul>");
+    var list = $('<ul class="form-list"></ul>');
     modal.append(list);
     forms.forEach(function(form) {
-      var li = $("<li></li>");
+      var li = $('<li></li>');
       li.click(function(evt) {
         Slide.presentModalForm(form, user.profile, cb);
       });
       li.text(form.name);
       list.append(li);
-    })
+    });
   },
 
   presentModalForm: function (vendorForm, userData, cb) {

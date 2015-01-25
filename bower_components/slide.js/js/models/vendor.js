@@ -3,7 +3,6 @@ import Crypto from '../utils/crypto';
 import Storage from '../utils/storage';
 import VendorForm from './vendor-form';
 import User from './user';
-import Securable from './securable';
 
 var Vendor = function (name, chk, id, keys) {
   if (keys) {
@@ -20,14 +19,14 @@ $.extend(Vendor.prototype, User.prototype);
 
 Vendor.prototype.persist = function () {
   var obj = {
-    number: this.number,
+    id: this.id,
+    name: this.name,
     publicKey: this.publicKey,
     privateKey: this.privateKey,
     symmetricKey: this.symmetricKey,
-    checksum: this.checksum,
-    id: this.id
+    checksum: this.checksum
   };
-  Storage.persist("vendor", obj);
+  Storage.persist('vendor', obj);
 };
 
 Vendor.fromObject = function (obj) {
@@ -43,7 +42,7 @@ Vendor.fromObject = function (obj) {
 };
 
 Vendor.load = function (fail, success) {
-  Storage.access("vendor", function(vendor) {
+  Storage.access('vendor', function(vendor) {
     if( Object.keys(vendor).length > 0 ) {
       success(Vendor.fromObject(vendor));
     } else {
@@ -64,7 +63,6 @@ Vendor.invite = function (name, cb) {
 Vendor.prototype.register = function (cb) {
   var invite = this.invite, id = this.id, keys = Crypto.generateKeysSync();
   this.generate();
-  var key = this.encryptedSymmetricKey();
   this.checksum = this.getChecksum();
   var self = this;
   API.put('/vendors/' + id, {
@@ -76,7 +74,7 @@ Vendor.prototype.register = function (cb) {
     },
     success: function (v) {
       self.id = v.id;
-      cb && cb(self);
+      if (cb) { cb(self); }
     }
   });
 };
@@ -97,7 +95,7 @@ Vendor.prototype.createForm = function (name, description, formFields, cb) {
       checksum: this.prettyChecksum()
     },
     success: function (form) {
-      cb && cb(VendorForm.fromObject(form));
+      if (cb) { cb(VendorForm.fromObject(form)); }
     }
   });
 };

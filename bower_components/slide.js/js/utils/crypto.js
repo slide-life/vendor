@@ -145,20 +145,20 @@ var Crypto = {
     return pub.decrypt(text);
   },
   prettyPayload: function(payload) {
-    if( typeof payload != 'string' ) {
-      throw new Error("First argument expected to be 'string'");
+    if( typeof payload !== 'string' ) {
+      throw new Error('First argument expected to be "string"');
     }
     if( payload.match(/=$/) ) {
-      console.warn("You may have provided a base64 encoded payload.");
+      console.warn('You may have provided a base64 encoded payload.');
     }
     return btoa(payload);
   },
   uglyPayload: function(payload) {
-    if( typeof payload != 'string' ) {
-      throw new Error("First argument expected to be 'string'");
+    if( typeof payload !== 'string' ) {
+      throw new Error('First argument expected to be "string"');
     }
     if( !payload.match(/^[A-Za-z=0-9+\/]+$/) ) {
-      throw new Error("Payload is not in base64 encoding.");
+      throw new Error('Payload is not in base64 encoding.');
     }
     return atob(payload);
   }

@@ -45,29 +45,3 @@ $table-border: 1px solid $medium-grey;
 .data-table tbody tr.selected {
   background-color: #DFE6EE;
 }
-
-.data-table-control {
-  background-color: $light-grey;
-  border-bottom: $table-border;
-  padding: 12px;
-  overflow: hidden;
-  text-align: right;
-}
-
-.data-table-control .filter-controls {
-  float: left;
-}
-
-.data-table-control .download-controls {
-  float: right;
-}
-
-.data-table-control .control {
-  padding: 8px;
-  border-radius: 4px;
-  background-color: white;
-  color: $bright-blue;
-  font-size: 14px;
-  border: 1px solid $bright-blue;
-  cursor: pointer;
-}

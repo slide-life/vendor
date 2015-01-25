@@ -62,6 +62,7 @@ var Block = {
       var hierarchy = path.hierarchy;
       var remaining_path = hierarchy.slice(0);
       var field = block.schema;
+
       while (remaining_path[0] in field) {
         field = field[remaining_path[0]];
         remaining_path = remaining_path.slice(1);
@@ -69,26 +70,26 @@ var Block = {
 
       if (remaining_path.length === 0) {
         cb(hierarchy, block);
+      } else {
+        Block._inherits(field).forEach(function (inheritance) {
+          var inheritanceIdentifier;
+          if (Block._isRoot(inheritance)) {
+            inheritanceIdentifier = inheritance + remaining_path.join('.');
+          } else {
+            inheritanceIdentifier = [inheritance].concat(remaining_path).join('.');
+          }
+
+          Block._resolveForIdentifier(inheritanceIdentifier, cb);
+        });
+
+        Block._components(field).filter(function (component) {
+          return Block._componentName(component) === remaining_path[0];
+        }).forEach(function (component) {
+          var inheritanceIdentifier =
+            [component].concat(remaining_path.slice(1)).join('.');
+          Block._resolveForIdentifier(inheritanceIdentifier, cb);
+        });
       }
-
-      Block._inherits(field).forEach(function (inheritance) {
-        var inheritanceIdentifier;
-        if (Block._isRoot(inheritance)) {
-          inheritanceIdentifier = inheritance + remaining_path.join('.');
-        } else {
-          inheritanceIdentifier = [inheritance].concat(remaining_path).join('.');
-        }
-
-        Block._resolveForIdentifier(inheritanceIdentifier, cb);
-      });
-
-      Block._components(field).filter(function (component) {
-        return Block._componentName(component) === remaining_path[0];
-      }).forEach(function (component) {
-        var inheritanceIdentifier =
-          [component].concat(remaining_path.slice(1)).join('.');
-        Block._resolveForIdentifier(inheritanceIdentifier, cb);
-      });
     });
   },
 

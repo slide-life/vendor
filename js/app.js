@@ -9,6 +9,8 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 /* App */
 
 (function($) {
+  var ORGANISATION = 'The COOP';
+
   var SlideVendor = function () {
     var self = this;
 
@@ -17,13 +19,23 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     this.templates = SlideVendorTemplates;
 
     /* Views */
+    this.$header = $('.header');
     this.$sidebar = $('.sidebar');
     this.$container = $('.container');
     this.$page = $('.container').find('.page');
 
     /* Vendor login */
+    this.loginOrRegister(function () {
+      self.updatePage(self.$sidebar.find('.link.active').data('target'));
+    });
+    this.initializeListeners();
+  };
+
+
+  SlideVendor.prototype.loginOrRegister = function (cb) {
+    var self = this;
     Slide.Vendor.load(function (next) {
-      Slide.Vendor.invite('thecoop.com', function (vendor) {
+      Slide.Vendor.invite(ORGANISATION, function (vendor) {
         vendor.register(function (vendor) {
           vendor.persist();
           next(vendor);
@@ -31,48 +43,26 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       });
     }, function (vendor) {
       self.vendor = vendor;
-      vendor.getProfile(function(profile) {
-        console.log(profile);
-        self.loadResponses(profile._responses, function (responses) {
-          console.log(responses);
-        });
-      });
-      vendor.loadForms(function (forms) {
-        self.data.forms = forms;
-        self.$page.html(self.templates.forms(forms));
-      });
+      self.$header.find('.user').html(Handlebars.partials.account(vendor));
+      cb();
     });
-
-    self.initializeListeners();
-  };
-
-  SlideVendor.prototype.loadResponses = function(responses, cb) {
-    var self = this;
-    for( var uuid in responses ) {
-      if( responses[uuid] ) {
-        new Slide.VendorUser(uuid).load(function(user) {
-          // var key = Slide.Crypto.decryptString(Slide.Crypto.uglyPayload(user.vendor_key),
-          //  self.vendor.privateKey);
-          var fields = Slide.Crypto.AES.decryptData(responses[uuid]._latest_profile, Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c="));
-          cb(fields);
-        });
-      }
-    }
   };
 
   SlideVendor.prototype.updatePage = function (target) {
-    var data;
-
+    var self = this;
     if (target === 'users') {
-      data = this.data.forms[0];
+      this.getUsers(function (users) {
+        self.data.users = users;
+        self.$page.html(self.templates[target](users));
+      });
     } else if (target === 'forms') {
-      data = this.data.forms;
+      this.vendor.loadForms(function (forms) {
+        self.data.forms = forms;
+        self.$page.html(self.templates[target](forms));
+      });
     } else {
       throw new Error('Invalid target: must be either users or forms');
     }
-
-    var content = this.templates[target](data);
-    this.$page.html(content);
   };
 
   SlideVendor.prototype.addResponseToForm  = function (id, response) {
@@ -100,15 +90,39 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     return fs;
   };
 
+  SlideVendor.prototype.getUsers = function (cb) {
+    // self.vendor.getProfile(function(profile) {
+    //   self.loadResponses(profile._responses, function (responses) {
+    //     console.log(profile);
+    //     console.log(responses);
+    //   });
+    // });
+    // var self = this;
+    // for (var uuid in responses) {
+    //   if (responses[uuid]) {
+    //     new Slide.VendorUser(uuid).load(function(user) {
+    //       // var key = Slide.Crypto.decryptString(Slide.Crypto.uglyPayload(user.vendor_key),
+    //       //  self.vendor.privateKey);
+    //       var fields = Slide.Crypto.AES.decryptData(responses[uuid]._latest_profile, Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c="));
+    //       cb(fields);
+    //     });
+    //   }
+    // }
+    this.vendor.getUsers(function (users) {
+      cb(users);
+    });
+  };
+
   SlideVendor.prototype.showResponsesForForm = function (form) {
     var self = this;
     this.getResponsesForForm(form, function (responses) {
       var identifiers = form.form_fields;
       Slide.Block.getFlattenedFieldsForIdentifiers(identifiers, function (fields) {
-        var template = Handlebars.partials['data-table']({
+        var template = Handlebars.partials['forms-table']({
           fields: self.transformFields(fields),
           responses: responses
         });
+        console.log(fields, template);
         self.$page.html(template);
       });
     });
@@ -181,49 +195,48 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       });
 
       self.createForm(name, description, fields, function (form) {
-        console.log(form);
-        var number = prompt('To whom?');
-        var user = new Slide.User(number);
-        user.get(function(user) {
-          new Slide.Actor('thecoop.com').initialize(function(actor) {
-            var downstream = {
-              type: 'user', downstream: number, key: user.public_key
-            };
-            Slide.VendorUser.createRelationship({
-              publicKey: user.public_key
-            }, self.vendor, function(vendorUser) {
-              console.log(vendorUser);
-              actor.openRequest({
-                form: form, vendorUser: vendorUser.uuid
-              }, downstream, function(msg) {
-                console.log(form);
-              });
-            });
-          });
-        });
-
+        form.form_fields = form.fields;
+        self.data.forms.push(form);
+        self.updatePage('forms');
       });
     });
 
     $(document).on('click', '.view-responses', function () {
-      var form = self.getFormById($(this).parents('.data-table-control').data('form'));
+      var form = self.getFormById($(this).parents('.form-list-item').data('form'));
       self.showResponsesForForm(form);
     });
 
 
     $(document).on('click', '.send-to-users', function () {
-      var form = self.getFormById($(this).parents('.data-table-control').data('form'));
+      var form = self.getFormById($(this).parents('.form-list-item').data('form'));
       var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
         return number.trim();
       });
 
       numbers.forEach(function (number) {
-        form.requestContentFromUser(number);
+        var user = new Slide.User(number);
+        user.get(function(user) {
+          new Slide.Actor(ORGANISATION).initialize(function(actor) {
+            var downstream = {
+              type: 'user', downstream: number, key: user.public_key
+            };
+            Slide.VendorUser.createRelationship({
+              publicKey: user.public_key,
+              number: user.number
+            }, self.vendor, function (vendorUser) {
+              console.log(form);
+              actor.openRequest({
+                form: form, vendorUser: vendorUser.uuid
+              }, downstream, function (msg) {
+                console.log(form);
+              });
+            });
+          });
+        });
       });
     });
   };
 
   var app = new SlideVendor();
   window.app = app;
-  app.updatePage(app.$sidebar.find('.link.active').data('target'));
 })($);

@@ -154,6 +154,7 @@ Form.prototype.build = function (userData, options) {
 
   this.$form.append(this._createSubmitButton());
   this.initializeListeners();
+  this.initializeMasks();
 };
 
 Form.prototype._createSubmitButton = function () {
@@ -181,6 +182,12 @@ Form.prototype.initializeListeners = function () {
   });
 };
 
+Form.prototype.initializeMasks = function () {
+  $.extend($.inputmask.defaults, {
+    'autoUnmask': true
+  });
+};
+
 Form.prototype._isCard = function (identifier) {
   return Form.CARDS.indexOf(identifier) !== -1;
 };
@@ -193,25 +200,66 @@ Form.prototype._getDataForIdentifier = function (identifier) {
 Form.prototype._createSlider = function (fields) {
   var slider = $('<ul></ul>', { class: 'slider'});
   return slider.append.apply(slider, fields);
-},
+};
+
+Form._bindMask = function (identifier, field, $input) {
+  var phonePrefixes = ['slide.life:mobile-phone', 'slide.life:home-phone', 'slide.life:work-phone'];
+  var phoneNumbers = phonePrefixes.map(function (prefix) { return prefix + '.number'; });
+  var phoneCountryCodes = phonePrefixes.map(function (prefix) { return prefix + '.country-code'; });
+
+  if (field._type === 'date') {
+    if (!field._format) { throw new Error('A date type must have an associated format'); }
+    $input.inputmask({ mask: field._format });
+  } else if (phoneNumbers.indexOf(identifier) > -1) {
+    $input.inputmask({ mask: '(999) 999-9999' });
+  } else if (phoneCountryCodes.indexOf(identifier) > -1) {
+    $input.inputmask({ mask: '+9[9[9]]', placeholder: '', greedy: false });
+  } else if (identifier === 'slide.life:bank.card.number') {
+    $input.inputmask({ mask: '9999 9999 9999 9999' });
+  } else if (identifier === 'slide.life:bank.card.security-code') {
+    $input.inputmask({ mask: '999[9]', greedy: false });
+  } else if (identifier === 'slide.life:ssn') {
+    $input.inputmask({ mask: '999-99-9999', greedy: false });
+  } else if (identifier === 'slide.life:email') {
+    $input.inputmask({ alias: 'email' });
+  }
+};
 
 Form.prototype._createField = function (identifier, field, data, options /* = {} */) {
   options = options || {};
 
   var $listItem = $('<li></li>', { class: 'field' }),
       $labelWrapper = $('<div></div>', { 'class': 'field-label-wrapper' }),
-      $inputWrapper = $('<div></div>', { 'class': 'field-input-wrapper' });
+      $inputWrapper = $('<div></div>', { 'class': 'field-input-wrapper' }),
+      $input;
 
-  var input = $('<input>', $.extend({
-    type: 'text',
-    class: 'field-input',
-    value: data,
-    autocorrect: 'off',
-    autocapitalize: 'off',
-    'data-slide-identifier': identifier
-  }, options));
+  if (field._type === 'select') {
+    $input = $('<select></select>');
+    if (!field._options) {
+      throw new Error('A select type must have a list of options');
+    } else {
+      field._options.forEach(function (option) {
+        var $option = $('<option></option>', {
+          class: 'field-input-select',
+          value: option
+        }).text(option);
+        $input.append($option);
+      });
+    }
+  } else {
+    $input = $('<input>', $.extend({
+      type: 'text',
+      class: 'field-input',
+      value: data,
+      autocorrect: 'off',
+      autocapitalize: 'off'
+    }, options));
+  }
 
-  $inputWrapper.append(input);
+  $input.attr('data-slide-identifier', identifier);
+  Form._bindMask(identifier, field, $input);
+
+  $inputWrapper.append($input);
   $labelWrapper.append($('<label></label>').text(field._description));
   return $listItem.append($labelWrapper, $inputWrapper);
 };
@@ -236,7 +284,7 @@ Form.prototype._createButton = function () {
   var $button = $('<div class="add-button">+</div>');
   var $buttonInnerWrapper = $('<div class="add-button-inner-wrapper"></div>').append($button);
   return $('<div class="add-button-wrapper"></div>').append($buttonInnerWrapper);
-}
+};
 
 Form.prototype._buildCard = function (identifier, field, card) {
   var $cardHeader = this.createCardHeader(identifier, field, card);
@@ -256,7 +304,7 @@ Form.prototype.createCard = function (identifier, field) {
     var $card = this._buildCard(identifier, field, {});
     [$card, $newCard].forEach(function ($c) {
       $c.find('.card-subfields').show();
-    })
+    });
     cards.push($card);
   }
 
@@ -310,20 +358,22 @@ Form.prototype.createCompound = function (identifier, field) {
 };
 
 Form.prototype._getFieldsInElement = function ($element, multi /* = false */) {
-  multi = multi !== undefined;
+  multi = (multi !== undefined);
 
-  var $fields = $element.find('.field-input'),
-      keystore = {};
+  var $fields = $element.find('.field-input');
+  var keystore = {};
 
   $fields.each(function () {
-    var key = $(this).data('slide-identifier'),
-        value = $(this).val();
+    var key = $(this).data('slide-identifier');
+    var value = $(this).val();
 
-    if (multi) {
-      keystore[key] = keystore[key] || [];
-      keystore[key].push(value);
-    } else {
-      keystore[key] = value;
+    if (!!value) {
+      if (multi) {
+        keystore[key] = keystore[key] || [];
+        keystore[key].push(value);
+      } else {
+        keystore[key] = value;
+      }
     }
   });
 
@@ -352,9 +402,11 @@ Form.prototype.getUserData = function () {
 
   this.$form.find('.card-wrapper').each(function (card) {
     var key = $(this).find('.card .card-header .field-input').data('slide-identifier');
-    cardData[key] = [];
     $(this).find('.card:not(.slick-cloned, .new-field) .card-subfields').each(function () {
-      cardData[key].push(self._getFieldsInElement($(this)));
+      if (!deepCompare(fields, {})) {
+        cardData[key] = cardData[key] || [];
+        cardData[key].push(self._getFieldsInElement($(this)));
+      }
     });
   });
 
@@ -366,7 +418,7 @@ Form.prototype.getPatchedUserData = function () {
   var updated = this.getUserData();
   var patch = {};
 
-  $.each(profile, function (identifier, key) {
+  $.each(updated, function (identifier, key) {
     if (!deepCompare(profile[identifier], updated[identifier])) {
       patch[identifier] = updated[identifier];
     }

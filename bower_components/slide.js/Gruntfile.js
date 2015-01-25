@@ -38,6 +38,9 @@ module.exports = function (grunt) {
       dist: {
         src: [
           'bower_components/forge/js/forge.bundle.js',
+          'bower_components/jquery.inputmask/dist/inputmask/jquery.inputmask.js',
+          'bower_components/jquery.inputmask/dist/inputmask/jquery.inputmask.extensions.js',
+          'bower_components/jquery.inputmask/dist/inputmask/jquery.inputmask.date.extensions.js',
           'bower_components/slick-carousel/slick/slick.js',
           'build/browser.js'],
         dest: 'dist/js/slide.js'

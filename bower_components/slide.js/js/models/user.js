@@ -1,5 +1,4 @@
 import API from '../utils/api';
-import Crypto from '../utils/crypto';
 import Storage from '../utils/storage';
 import Securable from './securable';
 
@@ -16,7 +15,7 @@ User.prototype.getId = function() {
   return this.number;
 };
 User.prototype.getDevice = function() {
-  return { type: 'user', number: this.getId(), key: this.publicKey };
+  return { type: 'user', number: this.number, key: this.publicKey };
 };
 User.serializeProfile = function(patch) {
   var prepped = {};
@@ -57,6 +56,15 @@ User.fromObject = function(obj) {
   return new this(obj.number, obj.publicKey, obj.privateKey, obj.symmetricKey);
 };
 
+User.prototype.get = function(cb) {
+  var self = this;
+  API.get('/users/' + this.number, {
+    success: function(data) {
+      cb(data);
+    }
+  });
+};
+
 User.prototype.persist = function() {
   var obj = {
     number: this.number,
@@ -64,20 +72,33 @@ User.prototype.persist = function() {
     privateKey: this.privateKey,
     symmetricKey: this.symmetricKey
   };
-  Storage.persist("user", obj);
+  Storage.persist('user', obj);
 };
 
 User.prototype.loadRelationships = function(success) {
   var self = this;
   API.get('/users/' + this.number + '/vendor_users', {
-    success: function (encryptedUuids) {
-      var uuids = encryptedUuids.map(function(encryptedUuid) {
-        return this.decryptData(encryptedUuid);
+    success: function (data) {
+      /*var uuids = encryptedUuids.map(function(encryptedUuid) {
+        return self.decryptData(encryptedUuid);
+      });*/
+      var encryptedUuids = data;
+      var vendorUsers = encryptedUuids.map(function(uuid) {
+        return new Slide.VendorUser(uuid);
       });
-      var vendorUsers = uuids.map(function(uuid) {
-        return Slide.VendorUser.new(uuid);
+      var count = 0;
+      if( vendorUsers.length == 0 ) {
+        success([]);
+      }
+      vendorUsers.forEach(function(vu){
+        vu.load(function() {
+          if( count + 1 == vendorUsers.length ) {
+            success(vendorUsers);
+          } else {
+            count++;
+          }
+        });
       });
-      success(vendorUsers);
     }
   });
 };
@@ -88,7 +109,22 @@ User.loadFromStorage = function (success, fail) {
       user = User.fromObject(user);
       user.loadRelationships(function(relationships) {
         user.relationships = relationships;
-        success(user);
+        user.forms = [];
+        if( relationships.length == 0 ) {
+          success(user);
+        } else {
+          var count = 0;
+          relationships.forEach(function(rel) {
+            rel.loadVendorForms(function(forms) {
+              user.forms.concat(forms);
+              if( count + 1 == relationships.length ) {
+                success(user);
+              } else {
+                count++;
+              }
+            });
+          });
+        }
       });
     } else {
       fail(success);
@@ -99,16 +135,16 @@ User.loadFromStorage = function (success, fail) {
 User.load = function(number, cb) {
   var self = this;
   this.loadFromStorage(cb, function () {
-    self.register(number, cb);
+    self.register(number, function(user) {
+      user.persist();
+      cb(user);
+    });
   });
 };
 
 User.register = function(number, cb, fail) {
-  var keys = Crypto.generateKeysSync();
   var user = new User();
-  var symmetricKey = Crypto.AES.generateKey();
   user.generate();
-  var key = user.encryptedSymmetricKey();
   user.number = number;
   API.post('/users', {
     data: {
@@ -118,7 +154,7 @@ User.register = function(number, cb, fail) {
     },
     success: function (u) {
       user.id = u.id;
-      cb && cb(user);
+      if (cb) { cb(user); }
     },
     failure: function(error) {
       fail(error);
@@ -140,14 +176,13 @@ User.prototype.patchProfile = function(patch, cb) {
   API.patch('/users/' + this.number + '/profile', {
     data: { patch: this.encryptData(patch) },
     success: function (user) {
-      cb && cb(self.decryptData(user.profile));
+      if (cb) { cb(self.decryptData(user.profile)); }
     }
   });
 };
 
 User.prototype.listen = function(cb) {
   var socket = API.socket('/users/' + this.number + '/listen');
-  var self = this;
   socket.onmessage = function (event) {
     var message = JSON.parse(event.data);
     if (message.verb === 'verb_request') {

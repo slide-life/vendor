@@ -76,14 +76,19 @@ $drop-shadow: 0px 2px 4px 0px rgba(160, 160, 160, 0.40);
   font-weight: 200;
   color: $medium-grey;
   font-size: 12px;
-  font-weight: 600;
   background: none;
   width: 100%;
   text-align: right;
   border: none;
   outline: none;
   -webkit-appearance: none;
-   -webkit-tap-highlight-color: rgba(0,0,0,0);
+  -webkit-tap-highlight-color: rgba(0,0,0,0);
+}
+
+.slide-form .field-group .field-input {
+  max-width: 100%;
+  font-weight: 200;
+  color: $medium-grey;
 }
 
 .slide-form .send-button {

@@ -8,8 +8,9 @@ var VendorUser = function(uuid) {
 };
 
 VendorUser.prototype.fromObject = function(obj) {
-  for( var k in obj )
+  for (var k in obj) {
     this[k] = obj[k];
+  }
 };
 
 VendorUser.prototype.load = function(cb) {
@@ -26,7 +27,7 @@ VendorUser.prototype.getVendorKey = function(privateKey) {
 };
 
 VendorUser.load = function(fail, success) {
-  Storage.access("vendor-user", function(vendorUser) {
+  Storage.access('vendor-user', function(vendorUser) {
     if( Object.keys(vendorUser).length > 0 ) {
       vendorUser = new VendorUser(vendorUser.uuid).fromObject(vendorUser);
       success(vendorUser);
@@ -36,18 +37,16 @@ VendorUser.load = function(fail, success) {
   });
 };
 VendorUser.persist = function(vendorUser) {
-  Storage.persist("vendor-user", vendorUser);
+  Storage.persist('vendor-user', vendorUser);
 };
 
 VendorUser.createRelationship = function(user, vendor, cb) {
-  var keys = Crypto.generateKeysSync();
-
   var key = Crypto.AES.generateKey();
   var userKey = Crypto.AES.encryptKey(key, user.publicKey);
   var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
   var checksum = Crypto.encrypt('', user.publicKey);
 
-  API.post('/vendors/'+vendor.id+'/vendor_users', {
+  API.post('/vendors/' + vendor.id + '/vendor_users', {
     data: {
       key: Crypto.AES.prettyKey(userKey),
       public_key: user.publicKey,
@@ -64,7 +63,15 @@ VendorUser.createRelationship = function(user, vendor, cb) {
       var vendorUser = new VendorUser(resp.uuid);
       vendorUser.fromObject(resp);
       // VendorUser.persist(vendorUser);
-      cb && cb(vendorUser);
+      // TODO: NB: venedor users are overwritten, not appended
+      API.patch('/users/' + user.number + '/profile', {
+        data: {
+          patch: {_vendor_users: JSON.stringify([resp.uuid])}
+        }, success: function(profile) {
+          console.log(profile);
+        }
+      });
+      if (cb) { cb(vendorUser); }
     }
   });
 };

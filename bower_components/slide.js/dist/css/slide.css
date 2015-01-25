@@ -243,7 +243,6 @@
   font-weight: 200;
   color: #C0C0C0;
   font-size: 12px;
-  font-weight: 600;
   background: none;
   width: 100%;
   text-align: right;
@@ -251,6 +250,11 @@
   outline: none;
   -webkit-appearance: none;
   -webkit-tap-highlight-color: transparent; }
+
+.slide-form .field-group .field-input {
+  max-width: 100%;
+  font-weight: 200;
+  color: #C0C0C0; }
 
 .slide-form .send-button {
   cursor: pointer;

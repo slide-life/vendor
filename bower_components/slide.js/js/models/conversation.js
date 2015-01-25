@@ -1,8 +1,10 @@
 import API from '../utils/api';
 import Crypto from '../utils/crypto';
 
-var Conversation = function(upstream, downstream, cb) {
-  this.symmetricKey = Crypto.AES.generateKey();
+var Conversation = function(upstream, downstream, cb, key) {
+  // NB. The fourth argument, key, is used in forming a form conversation.
+  this.symmetricKey = key || Crypto.AES.generateKey();
+  this.symmetricKey = Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
   this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
   this.upstream_type = upstream.type;
   this.downstream_type = downstream.type;
@@ -10,22 +12,27 @@ var Conversation = function(upstream, downstream, cb) {
   var upDevice = upstream.type === 'user' ? 'upstream_number' : 'upstream_id';
   this[device] = downstream.downstream;
   this[upDevice] = upstream.upstream;
+  console.log(this, downstream);
   this.initialize(function(conversation) {
     cb(conversation);
   });
 };
 
-Conversation.fromObject = function(obj, cb) {
+Conversation.fromObject = function (obj, cb) {
   $.extend(this, obj);
   this.initialize(cb);
 };
 
-Conversation.prototype.initialize = function(cb) {
+Conversation.prototype.initialize = function (cb) {
   var downstream_pack = this.downstream_type.toLowerCase() === 'user' ? {
     type: this.downstream_type.toLowerCase(), number: this.downstream_number
   } : {
     type: this.downstream_type.toLowerCase(), id: this.downstream_id
   };
+  if( this.downstream_type.toLowerCase() == 'vendor_user' ) {
+    downstream_pack = { type: this.downstream_type.toLowerCase(),
+      uuid: this.downstream_id };
+  }
   var upstream_pack = this.upstream_type.toLowerCase() === 'user' ? {
     type: this.upstream_type.toLowerCase(), number: this.upstream_number
   } : {
@@ -44,9 +51,9 @@ Conversation.prototype.initialize = function(cb) {
       self.id = conversation.id;
       cb(self);
     } });
-}
+};
 
-Conversation.prototype.request = function(blocks, cb) {
+Conversation.prototype.request = function (blocks, cb) {
   API.post('/conversations/' + this.id + '/request_content', {
     data: { blocks: blocks },
     success: cb
@@ -70,7 +77,7 @@ Conversation.prototype.submit = function(uuid, fields) {
   var payload = {};
   payload[uuid] = enc;
   API.put('/conversations/' + this.id, {
-    data: { fields: payload, patch: payload }
+    data: { fields: payload, patch: payload, conversation: this.id }
   });
 };
 

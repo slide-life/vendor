@@ -6,6 +6,13 @@ var VendorForm = function(name, fields, vendorId) {
   this.vendor = vendorId;
 };
 
+VendorForm.prototype.formConversation = function(user, key, cb) {
+  new Slide.Conversation(
+    {type: 'form', upstream: form.id },
+    {type: 'user', downstream: user.number, key: user.publicKey},
+    cb, key);
+};
+
 VendorForm.get = function(vendor, id, cb) {
   API.get('/vendors/'+vendor.id+'/vendor_forms/' + id, {
     data: { checksum: vendor.checksum },

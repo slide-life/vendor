@@ -1,8 +1,17 @@
-import API from './api';
-
 var cbs = {};
 var isReady = false;
 var queue = [];
+
+var runner = $('<iframe>', {
+  src: 'bower_components/slide.js/dist/views/auth.html'
+});
+
+$('body').append(runner);
+runner.hide();
+
+var process = function (msg) {
+  runner[0].contentWindow.postMessage(msg, '*');
+};
 
 window.addEventListener('message', function(evt) {
   var data = evt.message || evt.data;
@@ -15,26 +24,17 @@ window.addEventListener('message', function(evt) {
   delete cbs[data.channel];
 });
 
-var runner = $("<iframe>", {
-  src: 'bower_components/slide.js/dist/views/auth.html'
-});
-
-$("body").append(runner);
-runner.hide();
-var process = function(msg) {
-  runner[0].contentWindow.postMessage(msg, "*");
-};
-
 var Storage = {
   accessor: function(payload) {
-    if( isReady )
+    if (isReady) {
       process(payload);
-    else
+    } else {
       queue.push(payload);
+    }
   },
   persist: function(key, value) {
     this.accessor({
-      verb: "set",
+      verb: 'set',
       key: key,
       value: value
     });
@@ -43,7 +43,7 @@ var Storage = {
     var channel = Math.floor(Math.random() * 10000);
     cbs[channel] = cb;
     this.accessor({
-      verb: "get",
+      verb: 'get',
       key: key,
       channel: channel
     });
@@ -51,4 +51,3 @@ var Storage = {
 };
 
 export default Storage;
-

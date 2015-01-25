@@ -32,6 +32,36 @@ button {
   border-sizing: border-box;
   overflow-y: scroll; }
 
+.page-control, .form-list-item {
+  background-color: #F3F3F3;
+  border-bottom: 1px solid #C0C0C0;
+  padding: 12px;
+  overflow: hidden;
+  text-align: right; }
+
+.page-control .filter-controls, .form-list-item .filter-controls {
+  float: left; }
+
+.page-control .download-controls, .form-list-item .download-controls {
+  float: right; }
+
+.control {
+  padding: 8px;
+  border-radius: 4px;
+  background-color: white;
+  color: #5298FC;
+  font-size: 14px;
+  border: 1px solid #5298FC;
+  cursor: pointer; }
+
+.form-control {
+  margin-bottom: 16px; }
+
+.form-list-item {
+  line-height: 35px;
+  margin-bottom: 12px;
+  border-top: 1px solid #C0C0C0; }
+
 /* Structure */
 /* Colours */
 /* Common properties */
@@ -145,28 +175,6 @@ button {
 .data-table tbody tr.selected {
   background-color: #DFE6EE; }
 
-.data-table-control {
-  background-color: #F3F3F3;
-  border-bottom: 1px solid #C0C0C0;
-  padding: 12px;
-  overflow: hidden;
-  text-align: right; }
-
-.data-table-control .filter-controls {
-  float: left; }
-
-.data-table-control .download-controls {
-  float: right; }
-
-.data-table-control .control {
-  padding: 8px;
-  border-radius: 4px;
-  background-color: white;
-  color: #5298FC;
-  font-size: 14px;
-  border: 1px solid #5298FC;
-  cursor: pointer; }
-
 .empty-wrapper {
   height: 100%;
   text-align: center; }
@@ -176,7 +184,7 @@ button {
   top: 50%;
   height: 1px;
   margin: 0 auto;
-  margin-top: -80px;
+  margin-top: -150px;
   width: 250px; }
 
 .empty-image {

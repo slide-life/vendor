@@ -35,3 +35,40 @@ button {
   border-sizing: border-box;
   overflow-y: scroll;
 }
+
+.page-control {
+  background-color: $light-grey;
+  border-bottom: 1px solid $medium-grey;
+  padding: 12px;
+  overflow: hidden;
+  text-align: right;
+}
+
+.page-control .filter-controls {
+  float: left;
+}
+
+.page-control .download-controls {
+  float: right;
+}
+
+.control {
+  padding: 8px;
+  border-radius: 4px;
+  background-color: white;
+  color: $bright-blue;
+  font-size: 14px;
+  border: 1px solid $bright-blue;
+  cursor: pointer;
+}
+
+.form-control {
+  margin-bottom: 16px;
+}
+
+.form-list-item {
+  @extend .page-control;
+  line-height: 35px;
+  margin-bottom: 12px;
+  border-top: 1px solid $medium-grey;
+}
