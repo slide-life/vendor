@@ -162,6 +162,19 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 
       self.createForm(name, description, fields, function (form) {
         console.log(form);
+        var number = prompt('To whom?');
+        var user = new Slide.User(number);
+        user.get(function(user) {
+          new Slide.Actor('thecoop.com').initialize(function(actor) {
+            var downstream = {
+              type: 'user', downstream: number, key: user.public_key
+            };
+            actor.openRequest(form, downstream, function(msg) {
+              console.log(form);
+            });
+          });
+        });
+
       });
     });
 
