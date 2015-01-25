@@ -26,7 +26,7 @@ module.exports = function (grunt) {
 
     exec: {
       bundle: 'cd bower_components/forge; npm run bundle',
-      copyFonts: 'mkdir dist; cp -R views dist; cp -R img dist; cp -R fonts dist',
+      copyStatic: 'mkdir dist; cp -R views dist; cp -R img dist',
       copy: 'cp -R views/auth.html dist/views/auth.html'
     },
 
@@ -79,9 +79,10 @@ module.exports = function (grunt) {
     mochaTest: {
       test: {
         options: {
-          reporter: 'spec'
+          reporter: 'spec',
+          captureFile: 'logs/tests.log'
         },
-        src: 'tests/**/*.js'
+        src: 'tests/*.js'
       }
     }
   });
@@ -97,5 +98,5 @@ module.exports = function (grunt) {
   grunt.loadNpmTasks('grunt-mocha-test');
 
   grunt.registerTask('default', ['clean', 'transpile', 'browserify', 'exec', 'concat', 'sass']);
-  grunt.registerTask('test', 'mochaTest');
+  grunt.registerTask('test', ['transpile', 'mochaTest']);
 };

@@ -30644,23 +30644,900 @@ return require('js/forge');
     };
 
 }));
-;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+;;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 "use strict";
-var Crypto = require("./slide/crypto")["default"];
-var Actor = require("./slide/actor")["default"];
-var Conversation = require("./slide/conversation")["default"];
-var User = require("./slide/user")["default"];
-var Block = require("./slide/block")["default"];
-var Vendor = require("./slide/vendor")["default"];
-var Form = require("./slide/form")["default"];
-var VendorForm = require("./slide/vendor_form")["default"];
-var VendorUser = require("./slide/vendor_user")["default"];
+var API = require("../utils/api")["default"];
+var Crypto = require("../utils/crypto")["default"];
+var Conversation = require("./conversation")["default"];
+var Securable = require("./securable")["default"];
+
+var Actor = function() {
+  var self = this;
+  var keys = Crypto.generateKeysSync();
+  self.publicKey = keys.publicKey;
+  self.privateKey = keys.privateKey;
+};
+
+$.extend(Actor.prototype, Securable.prototype);
+
+Actor.fromObject = function(obj) {
+  var actor = new Actor();
+  actor.privateKey = obj.privateKey;
+  actor.publicKey = obj.publicKey;
+  actor.name = obj.name;
+  actor.id = obj.id;
+  return actor;
+};
+
+Actor.prototype.openRequest = function(blocks, downstream, onMessage, onCreate) {
+  this.openConversation(downstream, function(conversation) {
+    onCreate && onCreate(conversation);
+    conversation.request(blocks);
+  }, onMessage);
+};
+
+Actor.prototype.register = function(cb) {
+  var self = this;
+  API.post('/actors', {
+    data: { name: this.name, public_key: this.publicKey },
+    success: cb
+  });
+};
+
+Actor.prototype.initialize = function(cb) {
+  var self = this;
+  this.register(function(actor) {
+    self.id = actor.id;
+    cb && cb(self);
+  });
+};
+
+Actor.prototype.openConversation = function(downstream, onCreate, onMessage) {
+  var self = this;
+  this.initialize(function(actor) {
+    self.id = actor.id;
+    self.listen(function(fields) {
+      // TODO: Propogate UI updates
+      onMessage(fields);
+    });
+
+    var conversation = new Conversation({
+      upstream: self.id,
+      type: 'actor'
+    }, downstream, onCreate);
+    self.symmetricKey = conversation.symmetricKey;
+  });
+};
+
+Actor.prototype.getId = function() {
+  return this.id;
+};
+
+Actor.prototype.getDevice = function() {
+  return { type: 'actor', id: this.getId(), key: this.publicKey };
+};
+
+Actor.prototype.onmessage = function(message, cb) {
+  if( message.verb === 'verb_request' ) {
+    cb(message.payload.blocks, message.payload.conversation);
+  } else {
+    var data = message.payload.fields;
+    cb(this.decryptData(data));
+  }
+};
+
+Actor.prototype._listen = function(Socket, cb) {
+  var socket = new Socket(API.endpoint('ws://', '/actors/' + this.id + '/listen'));
+  var self = this;
+  socket.onmessage = function (event) {
+    var message = JSON.parse(event.data);
+    self.onmessage(message, cb);
+  };
+};
+
+Actor.prototype.listen = function(cb) {
+  this._listen(WebSocket, cb);
+};
+
+exports["default"] = Actor;
+},{"../utils/api":10,"../utils/crypto":11,"./conversation":3,"./securable":4}],2:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+
+var Block = {
+  CACHED_BLOCKS: {},
+
+  _inherits: function (field) {
+    if ('_inherits' in field) {
+      return [field._inherits];
+    } else {
+      return [];
+    }
+  },
+
+  _components: function (field) {
+    if ('_components' in field) {
+      return field._components;
+    } else {
+      return [];
+    }
+  },
+
+  _pathOf: function (field) {
+    if (field.indexOf(':') > -1) {
+      return field.split(':')[1];
+    } else {
+      return field;
+    }
+  },
+
+  _separatePath: function (field) {
+    return field.split('.');
+  },
+
+  _componentName: function (field) {
+    return Block._separatePath(Block._pathOf(field)).pop();
+  },
+
+  _isRoot: function (inheritance) {
+    return inheritance[inheritance.length - 1] === ':';
+  },
+
+  _retrieveBlock: function (path, cb) {
+    if (Block.CACHED_BLOCKS[path.organization]) {
+      cb(Block.CACHED_BLOCKS[path.organization]);
+    } else {
+      API.get('/blocks', {
+        data: { organization: path.organization },
+        success: function (block) {
+          Block.CACHED_BLOCKS[path.organization] = block;
+          cb(block);
+        }
+      });
+    }
+  },
+
+  _resolveForIdentifier: function (identifier, cb) {
+    Block._resolve(Block.getPathForIdentifier(identifier), cb);
+  },
+
+  _resolve: function (path, cb) {
+    Block._retrieveBlock(path, function (block) {
+      var hierarchy = path.hierarchy;
+      var remaining_path = hierarchy.slice(0);
+      var field = block.schema;
+      while (remaining_path[0] in field) {
+        field = field[remaining_path[0]];
+        remaining_path = remaining_path.slice(1);
+      }
+
+      if (remaining_path.length === 0) {
+        cb(hierarchy, block);
+      }
+
+      Block._inherits(field).forEach(function (inheritance) {
+        var inheritanceIdentifier;
+        if (Block._isRoot(inheritance)) {
+          inheritanceIdentifier = inheritance + remaining_path.join('.');
+        } else {
+          inheritanceIdentifier = [inheritance].concat(remaining_path).join('.');
+        }
+
+        Block._resolveForIdentifier(inheritanceIdentifier, cb);
+      });
+
+      Block._components(field).filter(function (component) {
+        return Block._componentName(component) === remaining_path[0];
+      }).forEach(function (component) {
+        var inheritanceIdentifier =
+          [component].concat(remaining_path.slice(1)).join('.');
+        Block._resolveForIdentifier(inheritanceIdentifier, cb);
+      });
+    });
+  },
+
+  _resolveField: function (path, cb) {
+    Block._resolve(path, function (resultHierarchy, resultBlock) {
+      cb(resultHierarchy.reduce(function (obj, key) { return obj[key]; },
+                                resultBlock.schema));
+    });
+  },
+
+  _retrieveField: function (path, cb) {
+    Block._resolveField(path, function (field) {
+      var deferreds = [];
+
+      if (field._components) {
+        field._components.map(Block.getPathForIdentifier).forEach(function (componentPath) {
+          var deferred = new $.Deferred();
+          deferreds.push(deferred);
+
+          Block._retrieveField(componentPath, function (f) {
+            field[componentPath.hierarchy.pop()] = f;
+            deferred.resolve();
+          });
+        });
+      }
+
+      if (field._inherits) {
+        var inheritPath = Block.getPathForIdentifier(field._inherits);
+
+        var deferred = new $.Deferred();
+        deferreds.push(deferred);
+
+        Block._retrieveField(inheritPath, function (f) {
+          field = $.extend({}, f, field);
+          deferred.resolve();
+        });
+      }
+
+      $.when.apply($, deferreds).done(function () {
+        delete field._components;
+        delete field._inherits;
+        cb(field);
+      });
+    });
+  },
+
+  getPathForIdentifier: function (identifier) {
+    identifier = (identifier.indexOf(':') < 0) ? Slide.DEFAULT_ORGANIZATION + ':' + identifier : identifier;
+    var deconstructed = identifier.split(':');
+    return {
+      organization: deconstructed[0],
+      hierarchy: deconstructed[1].split('.'),
+      identifier: identifier
+    };
+  },
+
+  deconstructField: function (field) {
+    var children = {},
+    annotations = {};
+
+    for (var key in field) {
+      if (field.hasOwnProperty(key)) {
+        if (key[0] === '_') {
+          annotations[key] = field[key];
+        } else {
+          children[key] = field[key];
+        }
+      }
+    }
+
+    return { children: children, annotations: annotations };
+  },
+
+  getChildren: function (field) {
+    return Block.deconstructField(field).children;
+  },
+
+  getAnnotations: function (field) {
+    return Block.deconstructField(field).annotations;
+  },
+
+  flattenField: function (identifier, field) {
+    var children = Block.getChildren(field);
+    if (Object.keys(children).length > 0) {
+      return Object.keys(children).reduce(function (merged, id) {
+        return $.extend(merged, Block.flattenField(identifier + '.' + id, field[id]));
+      }, {});
+    } else {
+      var leaf = {};
+      leaf[identifier] = field;
+      return leaf;
+    }
+  },
+
+  getFlattenedFieldsForIdentifiers: function (identifiers, cb) {
+    Block.getFieldsForIdentifiers(identifiers, function (unflattenedFields) {
+      var fields = {};
+      $.each(unflattenedFields, function (identifier, field) {
+        $.extend(fields, Block.flattenField(identifier, field));
+      });
+      cb(fields);
+    });
+  },
+
+  getFieldsForIdentifiers: function (identifiers, cb) {
+    var fields = {},
+    deferreds = [],
+    paths = identifiers.map(Block.getPathForIdentifier);
+
+    paths.forEach(function (path) {
+      var deferred = new $.Deferred();
+      deferreds.push(deferred);
+      Block._retrieveField(path, function (field) {
+        fields[path.identifier] = field;
+        deferred.resolve();
+      });
+    });
+
+    $.when.apply($, deferreds).done(function () {
+      cb(fields);
+    });
+  }
+};
+
+exports["default"] = Block;
+},{"../utils/api":10}],3:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+var Crypto = require("../utils/crypto")["default"];
+
+var Conversation = function(upstream, downstream, cb) {
+  this.symmetricKey = Crypto.AES.generateKey();
+  this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
+  this.upstream_type = upstream.type;
+  this.downstream_type = downstream.type;
+  var device = downstream.type === 'user' ? 'downstream_number' : 'downstream_id';
+  var upDevice = upstream.type === 'user' ? 'upstream_number' : 'upstream_id';
+  this[device] = downstream.downstream;
+  this[upDevice] = upstream.upstream;
+  this.initialize(function(conversation) {
+    cb(conversation);
+  });
+};
+
+Conversation.fromObject = function(obj, cb) {
+  $.extend(this, obj);
+  this.initialize(cb);
+};
+
+Conversation.prototype.initialize = function(cb) {
+  var downstream_pack = this.downstream_type.toLowerCase() === 'user' ? {
+    type: this.downstream_type.toLowerCase(), number: this.downstream_number
+  } : {
+    type: this.downstream_type.toLowerCase(), id: this.downstream_id
+  };
+  var upstream_pack = this.upstream_type.toLowerCase() === 'user' ? {
+    type: this.upstream_type.toLowerCase(), number: this.upstream_number
+  } : {
+    type: this.upstream_type.toLowerCase(), id: this.upstream_id
+  };
+  var payload = {
+    key: Crypto.AES.prettyKey(this.key),
+    upstream: upstream_pack,
+    downstream: downstream_pack
+  };
+
+  var self = this;
+  API.post('/conversations', {
+    data: payload,
+    success: function (conversation) {
+      self.id = conversation.id;
+      cb(self);
+    } });
+}
+
+Conversation.prototype.request = function(blocks, cb) {
+  API.post('/conversations/' + this.id + '/request_content', {
+    data: { blocks: blocks },
+    success: cb
+  });
+};
+
+Conversation.prototype.deposit = function (fields) {
+  API.post('/conversations/' + this.id + '/deposit_content', {
+    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) }
+  });
+};
+
+Conversation.prototype.respond = function(fields) {
+  API.put('/conversations/' + this.id, {
+    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) }
+  });
+};
+
+Conversation.prototype.submit = function(uuid, fields) {
+  var enc = Crypto.AES.encryptData(fields, this.symmetricKey);
+  var payload = {};
+  payload[uuid] = enc;
+  API.put('/conversations/' + this.id, {
+    data: { fields: payload, patch: payload }
+  });
+};
+
+exports["default"] = Conversation;
+},{"../utils/api":10,"../utils/crypto":11}],4:[function(require,module,exports){
+"use strict";
+var Crypto = require("../utils/crypto")["default"];
+
+var Securable = function(pub, priv, key) {
+  this.loadWithKeys(pub, priv, key);
+};
+
+Securable.prototype.loadWithKeys = function(pub, priv, key) {
+  this.publicKey = pub;
+  this.privateKey = priv;
+  this.symmetricKey = key;
+};
+
+Securable.prototype.generate = function() {
+  var self = this;
+  var keys = Crypto.generateKeysSync();
+  self.publicKey = keys.publicKey;
+  self.privateKey = keys.privateKey;
+  self.symmetricKey = Crypto.AES.generateKey();
+};
+
+Securable.prototype.prettyKey = function() {
+  return Crypto.AES.prettyKey(this.encryptedSymmetricKey());
+};
+
+Securable.prototype.prettyPublicKey = function() {
+  return this.publicKey;
+};
+
+Securable.prototype.encryptedSymmetricKey = function() {
+  return Crypto.encrypt(this.symmetricKey, this.publicKey);
+};
+
+Securable.prototype.getChecksum = function() {
+  return Crypto.encrypt('', this.publicKey);
+};
+
+Securable.prototype.prettyChecksum = function() {
+  return this.checksum ? Crypto.prettyPayload(this.checksum) : this.checksum;
+};
+
+Securable.prototype.decrypt = function(data) {
+  return Crypto.AES.decrypt(data, this.symmetricKey);
+};
+
+Securable.prototype.decryptData = function(data) {
+  return Crypto.AES.decryptData(data, this.symmetricKey);
+};
+
+Securable.prototype.encrypt = function(data) {
+  return Crypto.AES.encrypt(data, this.symmetricKey);
+};
+
+Securable.prototype.encryptData = function(data) {
+  return Crypto.AES.encryptData(data, this.symmetricKey);
+};
+
+exports["default"] = Securable;
+},{"../utils/crypto":11}],5:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+var Crypto = require("../utils/crypto")["default"];
+var Storage = require("../utils/storage")["default"];
+var Securable = require("./securable")["default"];
+
+var User = function(number, pub, priv, key) {
+  this.number = number;
+  this.publicKey = pub;
+  this.privateKey = priv;
+  this.symmetricKey = key;
+};
+
+$.extend(User.prototype, Securable.prototype);
+
+User.prototype.getId = function() {
+  return this.number;
+};
+User.prototype.getDevice = function() {
+  return { type: 'user', number: this.getId(), key: this.publicKey };
+};
+User.serializeProfile = function(patch) {
+  var prepped = {};
+  for( var k in patch ) {
+    prepped[k.replace(/\./g, '/')] = JSON.stringify(patch[k]);
+  }
+  return prepped;
+};
+User.deserializeProfile = function(patch) {
+  var prepped = {};
+  for( var k in patch ) {
+    prepped[k.replace(/\//g, '.')] = JSON.parse(patch[k]);
+  }
+  return prepped;
+};
+
+User.prompt = function(cb) {
+  var user = new this();
+  var form = $('<form><input type="text"><input type="submit" value="Send"></form>');
+  $('#modal .modal-body').append(form);
+  form.submit(function(evt) {
+    evt.preventDefault();
+    var number = $(this).find('[type=text]').val();
+    API.get('/users/' + number + '/public_key', {
+      success: function(resp) {
+        var key = resp.public_key;
+        user.number = number;
+        user.symmetricKey = key;
+        cb.call(user, number, key);
+      }
+    });
+  });
+  $('#modal').modal('toggle');
+  return user;
+};
+
+User.fromObject = function(obj) {
+  return new this(obj.number, obj.publicKey, obj.privateKey, obj.symmetricKey);
+};
+
+User.prototype.persist = function() {
+  var obj = {
+    number: this.number,
+    publicKey: this.publicKey,
+    privateKey: this.privateKey,
+    symmetricKey: this.symmetricKey
+  };
+  Storage.persist("user", obj);
+};
+
+User.prototype.loadRelationships = function(success) {
+  var self = this;
+  API.get('/users/' + this.number + '/vendor_users', {
+    success: function (encryptedUuids) {
+      var uuids = encryptedUuids.map(function(encryptedUuid) {
+        return this.decryptData(encryptedUuid);
+      });
+      var vendorUsers = uuids.map(function(uuid) {
+        return Slide.VendorUser.new(uuid);
+      });
+      success(vendorUsers);
+    }
+  });
+};
+
+User.loadFromStorage = function (success, fail) {
+  Storage.access('user', function(user) {
+    if( Object.keys(user).length > 0 ) {
+      user = User.fromObject(user);
+      user.loadRelationships(function(relationships) {
+        user.relationships = relationships;
+        success(user);
+      });
+    } else {
+      fail(success);
+    }
+  });
+};
+
+User.load = function(number, cb) {
+  var self = this;
+  this.loadFromStorage(cb, function () {
+    self.register(number, cb);
+  });
+};
+
+User.register = function(number, cb, fail) {
+  var keys = Crypto.generateKeysSync();
+  var user = new User();
+  var symmetricKey = Crypto.AES.generateKey();
+  user.generate();
+  var key = user.encryptedSymmetricKey();
+  user.number = number;
+  API.post('/users', {
+    data: {
+      key: user.prettyKey(),
+      public_key: user.prettyPublicKey(),
+      user: number
+    },
+    success: function (u) {
+      user.id = u.id;
+      cb && cb(user);
+    },
+    failure: function(error) {
+      fail(error);
+    }
+  });
+};
+
+User.prototype.getProfile = function(cb) {
+  var self = this;
+  API.get('/users/' + this.number + '/profile', {
+    success: function(data) {
+      cb(self.decryptData(data));
+    }
+  });
+};
+
+User.prototype.patchProfile = function(patch, cb) {
+  var self = this;
+  API.patch('/users/' + this.number + '/profile', {
+    data: { patch: this.encryptData(patch) },
+    success: function (user) {
+      cb && cb(self.decryptData(user.profile));
+    }
+  });
+};
+
+User.prototype.listen = function(cb) {
+  var socket = API.socket('/users/' + this.number + '/listen');
+  var self = this;
+  socket.onmessage = function (event) {
+    var message = JSON.parse(event.data);
+    if (message.verb === 'verb_request') {
+      cb(message.payload.blocks, message.payload.conversation);
+    } else {
+      var data = message.payload.fields;
+      cb(this.decryptData(data));
+    }
+  };
+};
+
+User.prototype.requestPrivateKey = function(cb) {
+  var actor = new Slide.Actor();
+  var self = this;
+  actor.openRequest(['private-key'], this.number, this.symmetricKey, function(fields) {
+    cb.call(self, fields['private-key']);
+  });
+};
+
+
+exports["default"] = User;
+},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./securable":4}],6:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+
+var VendorForm = function(name, fields, vendorId) {
+  this.name = name;
+  this.fields = fields;
+  this.vendor = vendorId;
+};
+
+VendorForm.get = function(vendor, id, cb) {
+  API.get('/vendors/'+vendor.id+'/vendor_forms/' + id, {
+    data: { checksum: vendor.checksum },
+    success: function(vendor) {
+      cb(VendorForm.fromObject(vendor));
+    }
+  });
+};
+
+VendorForm.prototype.initialize = function(cb) {
+  // TODO: perhaps allow a vendor form to be posted after the fact
+};
+
+VendorForm.fromObject = function(obj) {
+  var form = new VendorForm(obj.name, obj.form_fields, obj.vendor_id);
+  form.vendor_key = obj.vendor_key;
+  form.id = obj.id;
+  form.responses = obj.responses;
+  return form;
+};
+
+exports["default"] = VendorForm;
+},{"../utils/api":10}],7:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+var Crypto = require("../utils/crypto")["default"];
+var Storage = require("../utils/storage")["default"];
+var User = require("./user")["default"];
+
+var VendorUser = function(uuid) {
+  this.uuid = uuid;
+};
+
+VendorUser.prototype.fromObject = function(obj) {
+  for( var k in obj )
+    this[k] = obj[k];
+};
+
+VendorUser.prototype.load = function(cb) {
+  var self = this;
+  API.get('/vendor_users/' + this.uuid,
+    { success: function(vendor) {
+      self.fromObject(vendor);
+      cb(self);
+    }});
+};
+
+VendorUser.prototype.getVendorKey = function(privateKey) {
+  return Crypto.decrypt(this.vendorKey, privateKey);
+};
+
+VendorUser.load = function(fail, success) {
+  Storage.access("vendor-user", function(vendorUser) {
+    if( Object.keys(vendorUser).length > 0 ) {
+      vendorUser = new VendorUser(vendorUser.uuid).fromObject(vendorUser);
+      success(vendorUser);
+    } else {
+      fail(success);
+    }
+  });
+};
+VendorUser.persist = function(vendorUser) {
+  Storage.persist("vendor-user", vendorUser);
+};
+
+VendorUser.createRelationship = function(user, vendor, cb) {
+  var keys = Crypto.generateKeysSync();
+
+  var key = Crypto.AES.generateKey();
+  var userKey = Crypto.AES.encryptKey(key, user.publicKey);
+  var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
+  var checksum = Crypto.encrypt('', user.publicKey);
+
+  API.post('/vendors/'+vendor.id+'/vendor_users', {
+    data: {
+      key: Crypto.AES.prettyKey(userKey),
+      public_key: user.publicKey,
+      checksum: vendor.prettyChecksum(),
+      login_checksum: Crypto.prettyPayload(checksum),
+      vendor_key: Crypto.prettyPayload(vendorKey)
+    },
+    success: function(resp) {
+      resp.checksum = checksum;
+      resp.privateKey = user.privateKey;
+      resp.generatedKey = key;
+      resp.vendorKey = vendorKey;
+
+      var vendorUser = new VendorUser(resp.uuid);
+      vendorUser.fromObject(resp);
+      // VendorUser.persist(vendorUser);
+      cb && cb(vendorUser);
+    }
+  });
+};
+
+VendorUser.prototype.loadVendorForms = function(cb) {
+  API.get('/vendor_users/' + this.uuid + '/vendor_forms', {
+    data: { checksum: this.checksum ? Crypto.prettyPayload(this.checksum) : this.checksum },
+    success: function(vendorForms) {
+      var vendorFormHash = {};
+      vendorForms.forEach(function(vf) {
+        var vendorForm = Slide.VendorForm.fromObject(vf);
+        vendorFormHash[vendorForm.name] = vendorForm;
+      });
+      cb(vendorFormHash);
+    }
+  });
+};
+
+$.extend(VendorUser.prototype, User.prototype);
+
+exports["default"] = VendorUser;
+},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./user":5}],8:[function(require,module,exports){
+"use strict";
+var API = require("../utils/api")["default"];
+var Crypto = require("../utils/crypto")["default"];
+var Storage = require("../utils/storage")["default"];
+var VendorForm = require("./vendor-form")["default"];
+var User = require("./user")["default"];
+var Securable = require("./securable")["default"];
+
+var Vendor = function (name, chk, id, keys) {
+  if (keys) {
+    this.publicKey = keys.pub;
+    this.privateKey = keys.priv;
+    this.symmetricKey = keys.sym;
+    this.checksum = chk || this.checksum();
+  }
+  this.name = name;
+  this.id = id;
+};
+
+$.extend(Vendor.prototype, User.prototype);
+
+Vendor.prototype.persist = function () {
+  var obj = {
+    number: this.number,
+    publicKey: this.publicKey,
+    privateKey: this.privateKey,
+    symmetricKey: this.symmetricKey,
+    checksum: this.checksum,
+    id: this.id
+  };
+  Storage.persist("vendor", obj);
+};
+
+Vendor.fromObject = function (obj) {
+  var keys = { pub: obj.publicKey, priv: obj.privateKey, sym: obj.symmetricKey };
+  var vendor;
+  if( keys.pub || keys.priv || keys.sym ) {
+    vendor = new Vendor(obj.name, obj.checksum, obj.id, keys);
+  } else {
+    vendor = new Vendor(obj.name, obj.checksum, obj.id);
+  }
+  vendor.invite = obj.invite_code;
+  return vendor;
+};
+
+Vendor.load = function (fail, success) {
+  Storage.access("vendor", function(vendor) {
+    if( Object.keys(vendor).length > 0 ) {
+      success(Vendor.fromObject(vendor));
+    } else {
+      fail(success);
+    }
+  });
+};
+
+Vendor.invite = function (name, cb) {
+  API.post('/admin/vendors', {
+    data: { name: name },
+    success: function (vendor) {
+      cb(Vendor.fromObject(vendor));
+    }
+  });
+};
+
+Vendor.prototype.register = function (cb) {
+  var invite = this.invite, id = this.id, keys = Crypto.generateKeysSync();
+  this.generate();
+  var key = this.encryptedSymmetricKey();
+  this.checksum = this.getChecksum();
+  var self = this;
+  API.put('/vendors/' + id, {
+    data: {
+      invite_code: invite,
+      key: this.prettyKey(),
+      public_key: keys.publicKey,
+      checksum: this.prettyChecksum()
+    },
+    success: function (v) {
+      self.id = v.id;
+      cb && cb(self);
+    }
+  });
+};
+
+Vendor.prototype.listen = function (cb) {
+  var socket = API.socket('ws://', '/vendors/' + this.number + '/listen');
+  socket.onmessage = function (event) {
+    cb();
+  };
+};
+
+Vendor.prototype.createForm = function (name, description, formFields, cb) {
+  API.post('/vendors/' + this.id + '/vendor_forms', {
+    data: {
+      name: name,
+      description: description,
+      form_fields: formFields,
+      checksum: this.prettyChecksum()
+    },
+    success: function (form) {
+      cb && cb(VendorForm.fromObject(form));
+    }
+  });
+};
+
+Vendor.prototype.loadForms = function(cb) {
+  API.get('/vendors/' + this.id + '/vendor_forms', {
+    data: { checksum: this.prettyChecksum() },
+    success: function(forms) {
+      cb(forms);
+    }
+  });
+};
+
+Vendor.prototype.getProfile = function(success, fail) {
+  API.get('/vendors/' + this.id + '/profile', {
+    data: { checksum: this.prettyChecksum() },
+    success: success,
+    fail: fail
+  });
+};
+
+Vendor.prototype.getUsers = function(success, fail) {
+  API.get('/vendors/' + this.id + '/vendor_users', {
+    data: { checksum: this.prettyChecksum() },
+    success: function(x) { success(x); },
+    fail: function(x) { fail(x); }
+  });
+};
+
+
+exports["default"] = Vendor;
+},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./securable":4,"./user":5,"./vendor-form":6}],9:[function(require,module,exports){
+"use strict";
+var Actor = require("./models/actor")["default"];
+var Conversation = require("./models/conversation")["default"];
+var User = require("./models/user")["default"];
+var Block = require("./models/block")["default"];
+var Vendor = require("./models/vendor")["default"];
+var VendorForm = require("./models/vendor-form")["default"];
+var VendorUser = require("./models/vendor-user")["default"];
+var Form = require("./views/form")["default"];
 
 var Slide = {
   DEFAULT_ORGANIZATION: 'slide.life',
-  CACHED_BLOCKS: {},
 
-  crypto: new Crypto(),
   Actor: Actor,
   Conversation: Conversation,
   User: User,
@@ -30787,87 +31664,11 @@ var Slide = {
   }
 };
 
+exports["default"] = Slide;
 window.Slide = Slide;
-},{"./slide/actor":2,"./slide/block":4,"./slide/conversation":5,"./slide/crypto":6,"./slide/form":7,"./slide/user":9,"./slide/vendor":10,"./slide/vendor_form":11,"./slide/vendor_user":12}],2:[function(require,module,exports){
+},{"./models/actor":1,"./models/block":2,"./models/conversation":3,"./models/user":5,"./models/vendor":8,"./models/vendor-form":6,"./models/vendor-user":7,"./views/form":13}],10:[function(require,module,exports){
 "use strict";
-var api = require("./api")["default"];
-
-function Actor(name) {
-  var self = this;
-  if (name) { this.name = name; }
-  Slide.crypto.generateKeys(function(keys) {
-    keys = Slide.crypto.packKeys(keys);
-    self.publicKey = keys.publicKey;
-    self.privateKey = keys.privateKey;
-  });
-}
-
-Actor.fromObject = function(obj) {
-  var actor = new Actor();
-  actor.privateKey = obj.privateKey;
-  actor.publicKey = obj.publicKey;
-  actor.name = obj.name;
-  actor.id = obj.id;
-  return actor;
-};
-
-Actor.prototype.openRequest = function(blocks, downstream, onMessage) {
-  this.openConversation(downstream, function(conversation) {
-    conversation.request(blocks);
-  }, onMessage);
-};
-
-Actor.prototype.initialize = function(cb) {
-  api.post('/actors', {
-    data: { key: this.publicKey },
-    success: cb.bind(this)
-  });
-};
-
-Actor.prototype.openConversation = function(downstream, onCreate, onMessage) {
-  var self = this;
-  this.initialize(function(actor) {
-    self.id = actor.id;
-    self.listen(function(fields) {
-      $('#modal').modal('toggle');
-      onMessage(fields);
-    });
-
-    var conversation = new Slide.Conversation({
-      upstream: self.id,
-      type: 'actor'
-    }, downstream, onCreate);
-    self.key = conversation.symmetricKey;
-  });
-};
-
-Actor.prototype.getId = function() {
-  return this.id;
-};
-
-Actor.prototype.getDevice = function() {
-  return { type: 'actor', id: this.getId(), key: this.publicKey };
-};
-
-Actor.prototype.listen = function(cb) {
-  var socket = api.socket('/actors/' + this.id + '/listen');
-  var self = this;
-  socket.onmessage = function (event) {
-    var message = JSON.parse(event.data);
-    if( message.verb === 'verb_request' ) {
-      cb(message.payload.blocks, message.payload.conversation);
-    } else {
-      var data = message.payload.fields;
-      console.log('dec', self.key);
-      cb(Slide.crypto.AES.decryptData(data, self.key));
-    }
-  };
-};
-
-exports["default"] = Actor;
-},{"./api":3}],3:[function(require,module,exports){
-"use strict";
-var HOST = 'api-sandbox.slide.life';
+var HOST = 'localhost:9292';
 
 exports["default"] = {
   endpoint: function(/* protocol, */ path) {
@@ -30888,6 +31689,11 @@ exports["default"] = {
     options.url = this.endpoint(path);
     options.type = 'GET';
     options.dataType = 'json';
+    if (options.data) {
+      for (var k in options.data) {
+        options.data[k] = options.data[k].replace(/=/g, '*');
+      }
+    }
     $.ajax(options);
   },
 
@@ -30916,335 +31722,60 @@ exports["default"] = {
     return new WebSocket(this.endpoint('ws://', path));
   }
 };
-},{}],4:[function(require,module,exports){
+},{}],11:[function(require,module,exports){
 "use strict";
-var api = require("./api")["default"];
-
-var Block = {
-  _inherits: function (field) {
-    if ('_inherits' in field) {
-      return [field._inherits];
-    } else {
-      return [];
-    }
-  },
-
-  _components: function (field) {
-    if ('_components' in field) {
-      return field._components;
-    } else {
-      return [];
-    }
-  },
-
-  _pathOf: function (field) {
-    if (field.indexOf(':') > -1) {
-      return field.split(':')[1];
-    } else {
-      return field;
-    }
-  },
-
-  _separatePath: function (field) {
-    return field.split('.');
-  },
-
-  _componentName: function (field) {
-    return Block._separatePath(Block._pathOf(field)).pop();
-  },
-
-  _isRoot: function (inheritance) {
-    return inheritance[inheritance.length - 1] === ':';
-  },
-
-  _safeResolveForIdentifier: function (identifier, cb) {
-    Block._safeResolve(Block.getPathForIdentifier(identifier), cb);
-  },
-
-  _safeResolve: function (path, cb) {
-    Block._retrieveBlock(path, function (inheritanceBlock) {
-      Block._resolve(path, inheritanceBlock, cb);
-    });
-  },
-
-  _resolve: function (path, block, cb) {
-    var hierarchy = path.hierarchy;
-    var remaining_path = hierarchy.slice(0);
-    var field = block.schema;
-    while (remaining_path[0] in field) {
-      field = field[remaining_path[0]];
-      remaining_path = remaining_path.slice(1);
-    }
-
-    if (remaining_path.length === 0) {
-      cb(hierarchy, block);
-    }
-
-    Block._inherits(field).forEach(function (inheritance) {
-      var inheritanceIdentifier;
-      if (Block._isRoot(inheritance)) {
-        inheritanceIdentifier = inheritance + remaining_path.join('.');
-      } else {
-        inheritanceIdentifier = [inheritance].concat(remaining_path).join('.');
-      }
-
-      Block._safeResolveForIdentifier(inheritanceIdentifier, cb);
-    });
-
-    Block._components(field).filter(function (component) {
-      return Block._componentName(component) === remaining_path[0];
-    }).forEach(function (component) {
-      var inheritanceIdentifier =
-        [component].concat(remaining_path.slice(1)).join('.');
-      Block._safeResolveForIdentifier(inheritanceIdentifier, cb);
-    });
-  },
-
-  _resolveField: function (path, block, cb) {
-    Block._resolve(path, block, function (resultHierarchy, resultBlock) {
-      cb(resultHierarchy.reduce(function (obj, key) { return obj[key]; },
-        resultBlock.schema));
-    });
-  },
-
-  _retrieveField: function (path, block, cb) {
-    Block._resolveField(path, block, function (field) {
-      var deferreds = [];
-
-      if (field._components) {
-        field._components.map(Block.getPathForIdentifier).forEach(function (componentPath) {
-          var deferred = new $.Deferred();
-          deferreds.push(deferred);
-
-          Block._retrieveFieldFromPath(componentPath, function (f) {
-            field[componentPath.hierarchy.pop()] = f;
-            deferred.resolve();
-          });
-        });
-      }
-
-      if (field._inherits) {
-        var componentPath = Block.getPathForIdentifier(field._inherits);
-        field._inherits = componentPath.identifier;
-
-        var deferred = new $.Deferred();
-        deferreds.push(deferred);
-
-        Block._retrieveFieldFromPath(componentPath, function (f) {
-          field = $.extend({}, f, field);
-
-          f._assigns = f._assigns || [];
-          f._assigns.push(path.identifier);
-
-          deferred.resolve();
-        });
-      }
-
-      $.when.apply($, deferreds).done(function () {
-        delete field._components;
-        cb(field);
-      });
-    });
-  },
-
-  getPathForIdentifier: function (identifier) {
-    identifier = (identifier.indexOf(':') < 0) ? Slide.DEFAULT_ORGANIZATION + ':' + identifier : identifier;
-    var deconstructed = identifier.split(':');
-    return {
-      organization: deconstructed[0],
-      hierarchy: deconstructed[1].split('.'),
-      identifier: identifier
-    };
-  },
-
-  _retrieveBlock: function (path, cb) {
-    if (Slide.CACHED_BLOCKS[path.organization]) {
-      cb(Slide.CACHED_BLOCKS[path.organization]);
-    } else {
-      api.get('/blocks', {
-        data: { organization: path.organization },
-        success: function (block) {
-          Slide.CACHED_BLOCKS[path.organization] = block;
-          cb(block);
-        }
-      });
-    }
-  },
-
-  deconstructField: function (field) {
-    var children = {},
-        annotations = {};
-
-    for (var key in field) {
-      if (field.hasOwnProperty(key)) {
-        if (key[0] === '_') {
-          annotations[key] = field[key];
-        } else {
-          children[key] = field[key];
-        }
-      }
-    }
-
-    return { children: children, annotations: annotations };
-  },
-
-  getChildren: function (field) {
-    return Block.deconstructField(field).children;
-  },
-
-  getAnnotations: function (field) {
-    return Block.deconstructField(field).annotations;
-  },
-
-  _retrieveFieldFromPath: function (path, cb) {
-    Block._retrieveBlock(path, function (block) {
-      Block._retrieveField(path, block, function (field) {
-        cb(field);
-      });
-    });
-  },
-
-  getFieldsForIdentifiers: function (identifiers, cb) {
-    var fields = {},
-        deferreds = [],
-        paths = identifiers.map(Block.getPathForIdentifier);
-
-    paths.map(function (path) {
-      var deferred = new $.Deferred();
-      deferreds.push(deferred);
-      Block._retrieveFieldFromPath(path, function (field) {
-        fields[path.identifier] = field;
-        deferred.resolve();
-      });
-    });
-
-    $.when.apply($, deferreds).done(function () {
-      cb(fields);
-    });
-  }
-};
-
-exports["default"] = Block;
-},{"./api":3}],5:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-
-var Conversation = function(upstream, downstream, cb, sym) {
-  var key = sym || Slide.crypto.AES.generateKey();
-  var obj = {
-    symmetricKey: key,
-    key: Slide.crypto.encryptStringWithPackedKey(key, downstream.key),
-    upstream_type: upstream.type,
-    downstream_type: downstream.type
-  };
-  var device = downstream.type === 'user' ? 'downstream_number' : 'downstream_id';
-  var upDevice = upstream.type === 'user' ? 'upstream_number' : 'upstream_id';
-  obj[device] = downstream.downstream;
-  obj[upDevice] = upstream.upstream;
-  Conversation.FromObject.call(this, obj, cb.bind(this));
-};
-
-Conversation.FromObject = function(obj, cb) {
-  this.symmetricKey = obj.symmetricKey;
-  var self = this;
-  var downstream_pack = obj.downstream_type.toLowerCase() === 'user' ? {
-    type: obj.downstream_type.toLowerCase(), number: obj.downstream_number
-  } : {
-    type: obj.downstream_type.toLowerCase(), id: obj.downstream_id
-  };
-  var upstream_pack = obj.upstream_type.toLowerCase() === 'user' ? {
-    type: obj.upstream_type.toLowerCase(), number: obj.upstream_number
-  } : {
-    type: obj.upstream_type.toLowerCase(), id: obj.upstream_id
-  };
-
-  var payload = {
-    key: obj.key,
-    upstream: upstream_pack,
-    downstream: downstream_pack
-  };
-
-  api.post('/conversations', {
-    data: payload,
-    success: function (conversation) {
-      self.id = conversation.id;
-      cb(self);
-    }
-  });
-};
-
-Conversation.FromObject.prototype = Conversation.prototype;
-
-Conversation.prototype.request = function(blocks, cb) {
-  api.post('/conversations/' + this.id + '/request_content', {
-    data: { blocks: blocks },
-    success: cb
-  });
-};
-
-Conversation.prototype.deposit = function (fields) {
-  api.post('/conversations/' + this.id + '/deposit_content', {
-    data: { fields: Slide.crypto.AES.encryptData(fields, this.symmetricKey) }
-  });
-};
-
-Conversation.prototype.respond = function(fields) {
-  api.put('/conversations/' + this.id, {
-    data: { fields: Slide.crypto.AES.encryptData(fields, this.symmetricKey) }
-  });
-};
-
-Conversation.prototype.submit = function(uuid, fields) {
-  var enc = Slide.crypto.AES.encryptData(fields, this.symmetricKey);
-  var payload = {};
-  payload[uuid] = enc;
-  api.put('/conversations/' + this.id, {
-    data: { fields: payload, patch: payload }
-  });
-};
-
-exports["default"] = Conversation;
-},{"./api":3}],6:[function(require,module,exports){
-"use strict";
-exports["default"] = function () {
-  var rsa = forge.pki.rsa;
-  this.generateKeys = function(cb) {
+var Crypto = {
+  generateKeys: function (cb) {
     // This is a synchronous function, designed with a callback for the future.
-    cb(rsa.generateKeyPair({ bits: 512, e: 0x10001 }));
-  };
+    cb(forge.pki.rsa.generateKeyPair({ bits: 512, e: 0x10001 }));
+  },
 
-  this.packPublicKey = function(key) {
+  generateKeysSync: function() {
+    var keys;
+    this.generateKeys(function(k) {
+      keys = k;
+    });
+    return this.packKeys(keys);
+  },
+
+  packPublicKey: function (key) {
     return btoa(forge.pki.publicKeyToPem(key));
-  };
-  this.packPrivateKey = function(key) {
+  },
+  packPrivateKey: function (key) {
     return btoa(forge.pki.privateKeyToPem(key));
-  };
-  this.packKeys = function(keys) {
+  },
+
+  packKeys: function (keys) {
     return {
       publicKey: this.packPublicKey(keys.publicKey),
       privateKey: this.packPrivateKey(keys.privateKey)
     };
-  };
+  },
 
-  this.AES = {
+  AES: {
     generateCipher: function() {
       return {
         key: forge.random.getBytesSync(16),
         iv: forge.random.getBytesSync(16)
       };
     },
+
     _packCipher: function(cipher) {
-      return btoa(cipher.key+cipher.iv);
+      // TODO: NB! this and _unpack used to use btoa, atob
+      return cipher.key+cipher.iv;
     },
+
     _unpackCipher: function(packed) {
-      var decoded = atob(packed),
+      var decoded = packed,
           key = decoded.substr(0, 16),
           iv = decoded.substr(16);
       return {key:key,iv:iv};
     },
+
     generateKey: function() {
       return this._packCipher(this.generateCipher());
     },
+
     encrypt: function(payload, seed) {
       var unpacked = this._unpackCipher(seed),
           key = unpacked.key,
@@ -31255,6 +31786,7 @@ exports["default"] = function () {
       cipher.finish();
       return cipher.output.toHex();
     },
+
     decrypt: function(hex, seed) {
       var unpacked = this._unpackCipher(seed),
           key = unpacked.key,
@@ -31266,6 +31798,7 @@ exports["default"] = function () {
       decipher.finish();
       return decipher.output.data;
     },
+
     decryptData: function(data, key) {
       var clean = {};
       for( var k in data ) {
@@ -31273,57 +31806,149 @@ exports["default"] = function () {
       }
       return clean;
     },
+
     encryptData: function(data, key) {
       var encrypted = {};
       for( var k in data ) {
         encrypted[k] = btoa(this.encrypt(data[k], key));
       }
       return encrypted;
+    },
+
+    encryptKey: function (key, pub) {
+      // ascii-AES -> b64-RSA -> b64-RSA(AES)
+      return Crypto.encrypt(key, pub);
+    },
+    decryptKey: function (key, priv) {
+      // b64-RSA(AES) -> b64-RSA -> ascii-AES
+      return Crypto.decrypt(key, priv);
+    },
+
+    prettyKey: function(key) {
+      return Crypto.prettyPayload(key);
+    },
+    uglyKey: function(key) {
+      return Crypto.uglyPayload(key);
     }
-  };
+  },
 
-  this.decryptString = function(text, sec) {
+  decryptString: function (text, sec) {
     return sec.decrypt(text);
-  };
+  },
 
-  this.decryptData = function(data, sec) {
+  decryptData: function (data, sec) {
     var clean = {};
     for( var key in data ) {
       clean[key] = this.decryptString(atob(data[key]), sec);
     }
     return clean;
-  };
+  },
 
-  this.encryptString = function(text, pub) {
+  encryptString: function (text, pub) {
     return pub.encrypt(text);
-  };
+  },
 
-  this.encryptDataWithKey = function(data, pub) {
+  encryptDataWithKey: function (data, pub) {
     var encrypted = {};
     for( var key in data ) {
       encrypted[key] = btoa(this.encryptString(data[key], pub));
     }
     return encrypted;
-  };
+  },
 
-  this.encryptData = function(data, pem) {
+  encryptData: function (data, pem) {
     var pub = forge.pki.publicKeyFromPem(pem);
     return this.encryptDataWithKey(data, pub);
-  };
+  },
 
-  this.encryptStringWithPackedKey = function(text, key) {
+  encrypt: function (text, key) {
     var pub = forge.pki.publicKeyFromPem(atob(key));
-    return btoa(pub.encrypt(text));
-  };
+    return pub.encrypt(text);
+  },
 
-  this.decryptStringWithPackedKey = function(text, key) {
+  decrypt: function (text, key) {
     var pub = forge.pki.privateKeyFromPem(atob(key));
-    return pub.decrypt(atob(text));
-  };
-}
-},{}],7:[function(require,module,exports){
+    return pub.decrypt(text);
+  },
+  prettyPayload: function(payload) {
+    if( typeof payload != 'string' ) {
+      throw new Error("First argument expected to be 'string'");
+    }
+    if( payload.match(/=$/) ) {
+      console.warn("You may have provided a base64 encoded payload.");
+    }
+    return btoa(payload);
+  },
+  uglyPayload: function(payload) {
+    if( typeof payload != 'string' ) {
+      throw new Error("First argument expected to be 'string'");
+    }
+    if( !payload.match(/^[A-Za-z=0-9+\/]+$/) ) {
+      throw new Error("Payload is not in base64 encoding.");
+    }
+    return atob(payload);
+  }
+};
+
+exports["default"] = Crypto;
+},{}],12:[function(require,module,exports){
 "use strict";
-var Block = require("./block")["default"];
+var API = require("./api")["default"];
+
+var cbs = {};
+var isReady = false;
+var queue = [];
+
+window.addEventListener('message', function(evt) {
+  var data = evt.message || evt.data;
+  if(data.status) {
+    isReady = true;
+    queue.forEach(process);
+    return;
+  }
+  cbs[data.channel](data.value);
+  delete cbs[data.channel];
+});
+
+var runner = $("<iframe>", {
+  src: 'bower_components/slide.js/dist/views/auth.html'
+});
+
+$("body").append(runner);
+runner.hide();
+var process = function(msg) {
+  runner[0].contentWindow.postMessage(msg, "*");
+};
+
+var Storage = {
+  accessor: function(payload) {
+    if( isReady )
+      process(payload);
+    else
+      queue.push(payload);
+  },
+  persist: function(key, value) {
+    this.accessor({
+      verb: "set",
+      key: key,
+      value: value
+    });
+  },
+  access: function(key, cb) {
+    var channel = Math.floor(Math.random() * 10000);
+    cbs[channel] = cb;
+    this.accessor({
+      verb: "get",
+      key: key,
+      channel: channel
+    });
+  }
+};
+
+exports["default"] = Storage;
+},{"./api":10}],13:[function(require,module,exports){
+"use strict";
+var Block = require("../models/block")["default"];
 
 function deepCompare () {
   var i, l, leftChain, rightChain;
@@ -31510,21 +32135,6 @@ Form.prototype._isCard = function (identifier) {
   return Form.CARDS.indexOf(identifier) !== -1;
 };
 
-Form.prototype._flattenField = function (identifier, field) {
-  var children = Block.getChildren(field),
-      self = this;
-
-  if (Object.keys(children).length > 0) {
-    return Object.keys(children).reduce(function (merged, id) {
-      return $.extend(merged, self._flattenField(identifier + '.' + id, field[id]));
-    }, {});
-  } else {
-    var leaf = {};
-    leaf[identifier] = field;
-    return leaf;
-  }
-};
-
 Form.prototype._getDataForIdentifier = function (identifier) {
   var path = Block.getPathForIdentifier(identifier);
   return this.userData[path.identifier] || [];
@@ -31611,7 +32221,7 @@ Form.prototype.createCardHeader = function (identifier, field, card) {
 };
 
 Form.prototype.createCardSubfields = function (identifier, field, card) {
-  var fields = this._flattenField(identifier, field);
+  var fields = Block.flattenField(identifier, field);
   var compound = [], self = this;
 
   $.each(fields, function (i, f) {
@@ -31623,7 +32233,7 @@ Form.prototype.createCardSubfields = function (identifier, field, card) {
 };
 
 Form.prototype.createCompound = function (identifier, field) {
-  var fields = this._flattenField(identifier, field);
+  var fields = Block.flattenField(identifier, field);
   var compound = [], self = this;
 
   $.each(fields, function (i, f) {
@@ -31722,489 +32332,5 @@ Form.prototype.getStringifiedPatchedUserData = function () {
 };
 
 exports["default"] = Form;
-},{"./block":4}],8:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-
-var cbs = {};
-var isReady = false;
-var queue = [];
-
-window.addEventListener("message", function(evt) {
-  var data = evt.message || evt.data;
-  if(data.status) {
-    isReady = true;
-    queue.forEach(process);
-    return;
-  }
-  cbs[data.channel](data.value);
-  delete cbs[data.channel];
-}, false);
-
-var runner = $("<iframe>", {
-  src: 'bower_components/slide.js/dist/views/auth.html'
-});
-
-$("body").append(runner);
-runner.hide();
-var process = function(msg) {
-  runner[0].contentWindow.postMessage(msg, "*");
-};
-
-var Storage = {
-  accessor: function(payload) {
-    if( isReady )
-      process(payload);
-    else
-      queue.push(payload);
-  },
-  persist: function(key, value) {
-    this.accessor({
-      verb: "set",
-      key: key,
-      value: value
-    });
-  },
-  access: function(key, cb) {
-    var channel = Math.floor(Math.random() * 10000);
-    cbs[channel] = cb;
-    this.accessor({
-      verb: "get",
-      key: key,
-      channel: channel
-    });
-  }
-};
-
-exports["default"] = Storage;
-},{"./api":3}],9:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-var Storage = require("./storage")["default"];
-
-var User = function(number, pub, priv, key) {
-  this.number = number;
-  this.publicKey = pub;
-  this.privateKey = priv;
-  this.symmetricKey = key;
-};
-
-User.prototype.getId = function() {
-  return this.number;
-};
-User.prototype.getDevice = function() {
-  return { type: 'user', number: this.getId(), key: this.publicKey };
-};
-User.serializeProfile = function(patch) {
-  var prepped = {};
-  for( var k in patch ) {
-    prepped[k.replace(/\./g, '/')] = JSON.stringify(patch[k]);
-  }
-  return prepped;
-};
-User.deserializeProfile = function(patch) {
-  var prepped = {};
-  for( var k in patch ) {
-    prepped[k.replace(/\//g, '.')] = JSON.parse(patch[k]);
-  }
-  return prepped;
-};
-
-User.prompt = function(cb) {
-  var user = new this();
-  var form = $('<form><input type="text"><input type="submit" value="Send"></form>');
-  $('#modal .modal-body').append(form);
-  form.submit(function(evt) {
-    evt.preventDefault();
-    var number = $(this).find('[type=text]').val();
-    api.get('/users/' + number + '/public_key', {
-      success: function(resp) {
-        var key = resp.public_key;
-        user.number = number;
-        user.symmetricKey = key;
-        cb.call(user, number, key);
-      }
-    });
-  });
-  $('#modal').modal('toggle');
-  return user;
-};
-
-User.fromObject = function(obj) {
-  return new this(obj.number, obj.publicKey, obj.privateKey, obj.symmetricKey);
-};
-
-User.prototype.persist = function() {
-  var obj = {
-    number: this.number,
-    publicKey: this.publicKey,
-    privateKey: this.privateKey,
-    symmetricKey: this.symmetricKey
-  };
-  Storage.persist("user", obj);
-};
-
-User.prototype.loadRelationships = function(success) {
-  var self = this;
-  api.get('/users/' + this.number + '/vendor_users', {
-    success: function (encryptedUuids) {
-      var uuids = encryptedUuids.map(function(encryptedUuid) {
-        return Slide.crypto.AES.decryptData(encryptedUuid, self.symmetricKey);
-      });
-      var vendorUsers = uuids.map(function(uuid) {
-        return Slide.VendorUser.new(uuid);
-      });
-      success(vendorUsers);
-    }
-  });
-};
-
-User.load = function(fail, success) {
-  Storage.access("user", function(user) {
-    if( Object.keys(user).length > 0 ) {
-      user = User.fromObject(user);
-      user.loadRelationships(function(relationships) {
-        user.relationships = relationships;
-        success(user);
-      });
-    } else {
-      fail(success);
-    }
-  });
-};
-
-User.register = function(number, cb) {
-  var keys;
-  var user = new User();
-  Slide.crypto.generateKeys(function(k) {
-    keys = Slide.crypto.packKeys(k);
-  });
-  var symmetricKey = Slide.crypto.AES.generateKey();
-  var key = Slide.crypto.encryptStringWithPackedKey(symmetricKey, keys.publicKey);
-  user.symmetricKey = symmetricKey;
-  user.publicKey = keys.publicKey;
-  user.privateKey = keys.privateKey;
-  user.number = number;
-  api.post('/users', {
-    data: { key: key, public_key: keys.publicKey, user: number },
-    success: function (u) {
-      user.id = u.id;
-      cb && cb(user);
-    }
-  });
-};
-
-User.prototype.decryptData = function(data) {
-  return Slide.crypto.AES.decryptData(data, this.symmetricKey);
-};
-User.prototype.decrypt = function(data) {
-  return Slide.crypto.AES.decrypt(data, this.symmetricKey);
-};
-
-User.prototype.encryptData = function(data) {
-  return Slide.crypto.AES.encryptData(data, this.symmetricKey);
-};
-User.prototype.encrypt = function(data) {
-  return Slide.crypto.AES.encrypt(data, this.symmetricKey);
-};
-
-User.prototype.getProfile = function(cb) {
-  var self = this;
-  api.get('/users/' + this.number + '/profile', {
-    success: function(data) {
-      cb(self.decryptData(data));
-    }
-  });
-};
-
-User.prototype.patchProfile = function(patch, cb) {
-  var self = this;
-  api.patch('/users/' + this.number + '/profile', {
-    data: { patch: this.encryptData(patch) },
-    success: function (user) {
-      cb && cb(self.decryptData(user.profile));
-    }
-  });
-};
-
-User.prototype.listen = function(cb) {
-  var socket = api.socket('/users/' + this.number + '/listen');
-  var self = this;
-  socket.onmessage = function (event) {
-    var message = JSON.parse(event.data);
-    if (message.verb === 'verb_request') {
-      cb(message.payload.blocks, message.payload.conversation);
-    } else {
-      var data = message.payload.fields;
-      cb(Slide.crypto.AES.decryptData(data, self.symmetricKey));
-    }
-  };
-};
-
-User.prototype.requestPrivateKey = function(cb) {
-  var actor = new Slide.Actor();
-  var self = this;
-  actor.openRequest(['private-key'], this.number, this.symmetricKey, function(fields) {
-    cb.call(self, fields['private-key']);
-  });
-};
-
-exports["default"] = User;
-},{"./api":3,"./storage":8}],10:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-var User = require("./user")["default"];
-var Storage = require("./storage")["default"];
-
-var Vendor = function (name, chk, id, keys) {
-  if (keys) {
-    this.publicKey = keys.pub;
-    this.privateKey = keys.priv;
-    this.symmetricKey = keys.sym;
-    this.checksum = chk || Slide.crypto.encryptStringWithPackedKey('', keys.pub);
-  }
-  this.name = name;
-  this.id = id;
-};
-
-$.extend(Vendor.prototype, User.prototype);
-
-Vendor.prototype.persist = function () {
-  var obj = {
-    number: this.number,
-    publicKey: this.publicKey,
-    privateKey: this.privateKey,
-    symmetricKey: this.symmetricKey,
-    checksum: this.checksum,
-    id: this.id
-  };
-  Storage.persist("vendor", obj);
-};
-
-Vendor.fromObject = function (obj) {
-  var keys = { pub: obj.publicKey, priv: obj.privateKey, sym: obj.symmetricKey };
-  var vendor;
-  if( keys.pub || keys.priv || keys.sym ) {
-    vendor = new Vendor(obj.name, obj.checksum, obj.id, keys);
-  } else {
-    vendor = new Vendor(obj.name, obj.checksum, obj.id);
-  }
-  vendor.invite = obj.invite_code;
-  return vendor;
-};
-
-Vendor.load = function (fail, success) {
-  Storage.access("vendor", function(vendor) {
-    if( Object.keys(vendor).length > 0 ) {
-      success(Vendor.fromObject(vendor));
-    } else {
-      fail(success);
-    }
-  });
-};
-
-Vendor.invite = function (name, cb) {
-  api.post('/admin/vendors', {
-    data: { name: name },
-    success: function (vendor) {
-      cb(Vendor.fromObject(vendor));
-    }
-  });
-};
-
-Vendor.prototype.register = function (cb) {
-  var invite = this.invite, id = this.id, keys;
-  Slide.crypto.generateKeys(function (k) {
-    keys = Slide.crypto.packKeys(k);
-  });
-  var symmetricKey = Slide.crypto.AES.generateKey();
-  var key = Slide.crypto.encryptStringWithPackedKey(symmetricKey, keys.publicKey);
-  this.publicKey = keys.publicKey;
-  this.privateKey = keys.privateKey;
-  this.symmetricKey = symmetricKey;
-  this.checksum = Slide.crypto.encryptStringWithPackedKey('', keys.publicKey);
-  var self = this;
-  api.put('/vendors/' + id, {
-    data: {
-      invite_code: invite,
-      key: key,
-      public_key: keys.publicKey,
-      checksum: this.checksum
-    },
-    success: function (v) {
-      self.id = v.id;
-      cb && cb(self);
-    }
-  });
-};
-
-Vendor.prototype.listen = function (cb) {
-  var socket = api.socket('ws://', '/vendors/' + this.number + '/listen');
-  socket.onmessage = function (event) {
-    console.log('refresh');
-  };
-};
-
-Vendor.prototype.createForm = function (name, formFields, cb) {
-  api.post('/vendors/' + this.id + '/vendor_forms', {
-    data: {
-      name: name,
-      form_fields: formFields,
-      checksum: this.checksum
-    },
-    success: function (form) {
-      cb && cb(Slide.VendorForm.fromObject(form));
-    }
-  });
-};
-
-Vendor.prototype.loadForms = function(cb) {
-  api.get('/vendors/' + this.id + '/vendor_forms', {
-    data: { checksum: this.checksum },
-    success: function(forms) {
-      cb(forms);
-    }
-  });
-};
-
-Vendor.prototype.getProfile = function(cb) {
-  api.get('/vendors/' + this.id + '/profile', {
-    data: { checksum: this.checksum },
-    success: function(profile) {
-      cb(profile);
-    }
-  });
-};
-
-Vendor.prototype.getUsers = function(cb) {
-  api.get('/vendors/' + this.id + '/vendor_users', {
-    data: { checksum: this.checksum },
-    success: function(users) {
-      cb(users);
-    }
-  });
-};
-
-exports["default"] = Vendor;
-},{"./api":3,"./storage":8,"./user":9}],11:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-
-var VendorForm = function(name, fields, vendorId) {
-  this.name = name;
-  this.fields = fields;
-  this.vendor = vendorId;
-};
-
-VendorForm.get = function(vendor, id, cb) {
-  api.get('/vendors/'+vendor.id+'/vendor_forms/' + id, {
-    data: { checksum: vendor.checksum },
-    success: function(vendor) {
-      cb(VendorForm.fromObject(vendor));
-    }
-  });
-};
-
-VendorForm.prototype.initialize = function(cb) {
-  // TODO: perhaps allow a vendor form to be posted after the fact
-};
-
-VendorForm.fromObject = function(obj) {
-  var form = new VendorForm(obj.name, obj.form_fields, obj.vendor_id);
-  form.vendor_key = obj.vendor_key;
-  form.id = obj.id;
-  form.responses = obj.responses;
-  return form;
-};
-
-exports["default"] = VendorForm;
-},{"./api":3}],12:[function(require,module,exports){
-"use strict";
-var api = require("./api")["default"];
-var Storage = require("./storage")["default"];
-var User = require("./user")["default"];
-
-var VendorUser = function(uuid) {
-  this.uuid = uuid;
-};
-
-VendorUser.prototype.fromObject = function(obj) {
-  $.extend(this, obj);
-};
-
-VendorUser.prototype.load = function(cb) {
-  var self = this;
-  api.get('/vendor_users/' + this.uuid,
-    { success: function(vendor) {
-      self.fromObject(vendor);
-      cb(self);
-    }});
-};
-
-VendorUser.prototype.getVendorKey = function(privateKey) {
-  console.log(this);
-  return Slide.crypto.decryptStringWithPackedKey(this.vendorKey, privateKey);
-};
-
-VendorUser.load = function(fail, success) {
-  Storage.access("vendor-user", function(vendorUser) {
-    if( Object.keys(vendorUser).length > 0 ) {
-      vendorUser = new VendorUser(vendorUser.uuid).fromObject(vendorUser);
-      success(vendorUser);
-    } else {
-      fail(success);
-    }
-  });
-};
-VendorUser.persist = function(vendorUser) {
-  Storage.persist("vendor-user", vendorUser);
-};
-
-VendorUser.createRelationship = function(user, vendor, cb) {
-  var keys;
-  Slide.crypto.generateKeys(function(k) {
-    keys = k;
-  });
-
-  var key = Slide.crypto.AES.generateKey();
-  var userKey = Slide.crypto.encryptStringWithPackedKey(key, user.publicKey);
-  var vendorKey = Slide.crypto.encryptStringWithPackedKey(key, vendor.publicKey);
-  var checksum = Slide.crypto.encryptStringWithPackedKey('', user.publicKey);
-
-  api.post('/vendors/'+vendor.id+'/vendor_users', {
-    data: {
-      key: userKey, 
-      public_key: user.publicKey,
-      checksum: checksum,
-      vendor_key: vendorKey
-    },
-    success: function(resp) {
-      resp.checksum = checksum;
-      resp.privateKey = user.privateKey;
-      resp.generatedKey = key;
-
-      var vendorUser = new VendorUser(resp.uuid);
-      vendorUser.fromObject(resp);
-      VendorUser.persist(vendorUser);
-      cb && cb(vendorUser);
-    }
-  });
-};
-
-VendorUser.prototype.loadVendorForms = function(cb) {
-  api.get('/vendor_users/' + this.uuid + '/vendor_forms', {
-    success: function(vendorForms) {
-      var vendorFormHash = {};
-      vendorForms.forEach(function(vf) {
-        var vendorForm = Slide.VendorForm.fromObject(vf);
-        vendorFormHash[vendorForm.name] = vendorForm;
-      });
-      cb(vendorFormHash);
-    }
-  });
-};
-
-$.extend(VendorUser.prototype, User.prototype);
-
-exports["default"] = VendorUser;
-},{"./api":3,"./storage":8,"./user":9}]},{},[1])
+},{"../models/block":2}]},{},[9])
+;

@@ -1,30 +1,3 @@
-/* Fixtures */
-
-var FIXTURE_FORMS = [
-  {
-    name: 'Coop form',
-    id: '1232312',
-    fields: [
-      { description: 'First name', identifier: 'slide.life:name.first' },
-      { description: 'Last name', identifier: 'slide.life:name.last' },
-      { description: 'Title', identifier: 'slide.life:name.title' },
-      { description: 'Phone number', identifier: 'slide.life:mobile-phone.number' },
-      { description: 'Phone country code', identifier: 'slide.life:mobile-phone.country-code' },
-      { description: 'Address', identifier: 'slide.life:address.first-line' }
-    ],
-    responses: [
-      {
-        'slide.life:name.first': 'Jack',
-        'slide.life:name.last': 'Dent',
-        'slide.life:name.title': 'Mr.',
-        'slide.life:mobile-phone.number': '8572344988',
-        'slide.life:mobile-phone.country-code': '1',
-        'slide.life:address.first-line': '1318 Harvard Yard Mail Center'
-      }
-    ]
-  }
-];
-
 /* Handlebars helpers */
 
 Handlebars.registerHelper('buildResponseRow', function(response, fields, options) {
@@ -37,21 +10,52 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 
 (function($) {
   var SlideVendor = function () {
-    this.data = { forms: FIXTURE_FORMS };
-    this.$container = $('.container');
-    this.$page = $('.container').find('.page');
+    var self = this;
+
+    /* Data */
+    this.data = {};
     this.templates = SlideVendorTemplates;
 
-    this.initializeListeners();
-    this.updatePage('users-table');
+    /* Views */
+    this.$sidebar = $('.sidebar');
+    this.$container = $('.container');
+    this.$page = $('.container').find('.page');
+
+    /* Vendor login */
+    Slide.Vendor.load(function (next) {
+      Slide.Vendor.invite('thecoop.com', function (vendor) {
+        vendor.register(function (vendor) {
+          vendor.persist();
+          next(vendor);
+        });
+      });
+    }, function (vendor) {
+      self.vendor = vendor;
+      vendor.loadForms(function (forms) {
+        self.data.forms = forms;
+        self.$page.html(self.templates.forms(forms));
+      });
+    });
+
+    self.initializeListeners();
   };
 
   SlideVendor.prototype.updatePage = function (target) {
-    var content = this.templates[target](this.data.forms[0]);
+    var data;
+
+    if (target === 'users') {
+      data = this.data.forms[0];
+    } else if (target === 'forms') {
+      data = this.data.forms;
+    } else {
+      throw new Error('Invalid target: must be either users or forms');
+    }
+
+    var content = this.templates[target](data);
     this.$page.html(content);
   };
 
-  SlideVendor.prototype.addResponseForForm  = function (id, response) {
+  SlideVendor.prototype.addResponseToForm  = function (id, response) {
     var form;
 
     this.data.forms.forEach(function (f) {
@@ -68,9 +72,63 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     }
   };
 
+  SlideVendor.prototype.transformFields = function (fields) {
+    var fs = [];
+    $.each(fields, function (identifier, field) {
+      fs.push({ identifier: identifier, description: field._description });
+    });
+    return fs;
+  };
+
+  SlideVendor.prototype.showResponsesForForm = function (form) {
+    var self = this;
+    this.getResponsesForForm(form, function (responses) {
+      var identifiers = form.form_fields;
+      Slide.Block.getFlattenedFieldsForIdentifiers(identifiers, function (fields) {
+        var template = Handlebars.partials['data-table']({
+          fields: self.transformFields(fields),
+          responses: responses
+        });
+        self.$page.html(template);
+      });
+    });
+  }
+
+  SlideVendor.prototype.getResponsesForForm = function (form, cb) {
+    Slide.VendorForm.get(this.vendor, form.id, function(form) {
+      var responses = [];
+      for (var uuid in form.responses) {
+        if (form.responses[uuid]) {
+          new Slide.VendorUser(uuid).load(function(user) {
+            var key = Slide.crypto.decrypt(user.vendor_key,
+              vendor.privateKey);
+            var fields = Slide.crypto.AES.decryptData(form.responses[uuid], key);
+            responses.push({ user: user, fields: fields });
+          });
+        }
+      }
+      cb(responses);
+    });
+  };
+
+  SlideVendor.prototype.createForm = function (name, description, fields, cb) {
+    this.vendor.createForm(name, description, fields, cb);
+  };
+
+  SlideVendor.prototype.getFormById = function (id) {
+    var form;
+    this.data.forms.forEach(function (f) {
+      if (f.id === id) {
+        form = f;
+      }
+    });
+    return form;
+  };
+
   SlideVendor.prototype.initializeListeners = function () {
     this.initializeSidebarListeners();
-    this.initializDataTableListeners();
+    this.initializeDataTableListeners();
+    this.initializeFormListeners();
   };
 
   SlideVendor.prototype.initializeSidebarListeners = function () {
@@ -84,24 +142,48 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     });
   };
 
-  SlideVendor.prototype.initializDataTableListeners = function () {
+  SlideVendor.prototype.initializeDataTableListeners = function () {
     $(document).on('click', '.data-table tbody td', function () {
       $('.data-table tbody tr').removeClass('selected');
       $(this).parent().addClass('selected');
     });
   };
 
+  SlideVendor.prototype.initializeFormListeners = function () {
+    var self = this;
+
+    $(document).on('click', '.new-form', function () {
+      var representation = prompt('Input the fields for your forms').split('|');
+      var name = representation[0];
+      var description = representation[1];
+      var fields = representation[2].split(',').map(function (field) {
+        return field.trim();
+      });
+
+      self.createForm(name, description, fields, function (form) {
+        console.log(form);
+      });
+    });
+
+    $(document).on('click', '.view-responses', function () {
+      var form = self.getFormById($(this).parents('.data-table-control').data('form'));
+      self.showResponsesForForm(form);
+    });
+
+
+    $(document).on('click', '.send-to-users', function () {
+      var form = self.getFormById($(this).parents('.data-table-control').data('form'));
+      var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
+        return number.trim();
+      });
+
+      numbers.forEach(function (number) {
+        form.requestContentFromUser(number);
+      });
+    });
+  };
+
   var app = new SlideVendor();
-  setTimeout(function () {
-    var form = app.data.forms[0].id;
-    var response = {
-      'slide.life:name.first': 'Michael',
-      'slide.life:name.last': 'Gao',
-      'slide.life:name.title': 'Mr.',
-      'slide.life:mobile-phone.number': '75214213',
-      'slide.life:mobile-phone.country-code': '1',
-      'slide.life:address.first-line': '1232 Harvard Yard Mail Center'
-    };
-    app.addResponseForForm(form, response);
-  }, 2000);
+  window.app = app;
+  app.updatePage(app.$sidebar.find('.link.active').data('target'));
 })($);

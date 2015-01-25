@@ -1,0 +1,14 @@
+<table class="data-table" data-slide-table={{id}}>
+  <thead>
+    <tr>
+      {{#each fields}}
+        <td>{{description}}</td>
+      {{/each}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each responses}}
+      {{> response-row response=this fields=../fields}}
+    {{/each}}
+  </tbody>
+</table>

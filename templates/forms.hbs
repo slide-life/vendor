@@ -1,0 +1,23 @@
+<div class="data-table-control" style="margin-bottom: 16px;">
+  <div class="download-controls">
+    <button class="control new-form"><span class="glyphicon glyphicon-plus"></span> Create new form</button>
+  </div>
+</div>
+{{#each this}}
+  <div class="data-table-control" data-form={{id}}>
+    <div class="filter-controls">
+      {{name}}
+    </div>
+    <div class="download-controls">
+      <button class="control send-to-users"><span class="glyphicon glyphicon-send"></span> Send to users</button>
+      <button class="control view-responses"><span class="glyphicon glyphicon glyphicon-inbox"></span> View responses</button>
+    </div>
+  </div>
+{{else}}
+  <div class="empty-wrapper">
+    <div class="empty-inner-wrapper">
+      <div class="empty-image empty-users"></div>
+      <div class="empty-label">You have not created any forms yet.</div>
+    </div>
+  </div>
+{{/each}}
