@@ -31,6 +31,12 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       });
     }, function (vendor) {
       self.vendor = vendor;
+      vendor.getProfile(function(profile) {
+        console.log(profile);
+        self.loadResponses(profile._responses, function (responses) {
+          console.log(responses);
+        });
+      });
       vendor.loadForms(function (forms) {
         self.data.forms = forms;
         self.$page.html(self.templates.forms(forms));
@@ -38,6 +44,20 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     });
 
     self.initializeListeners();
+  };
+
+  SlideVendor.prototype.loadResponses = function(responses, cb) {
+    var self = this;
+    for( var uuid in responses ) {
+      if( responses[uuid] ) {
+        new Slide.VendorUser(uuid).load(function(user) {
+          // var key = Slide.Crypto.decryptString(Slide.Crypto.uglyPayload(user.vendor_key),
+          //  self.vendor.privateKey);
+          var fields = Slide.Crypto.AES.decryptData(responses[uuid]._latest_profile, Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c="));
+          cb(fields);
+        });
+      }
+    }
   };
 
   SlideVendor.prototype.updatePage = function (target) {
@@ -169,8 +189,15 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
             var downstream = {
               type: 'user', downstream: number, key: user.public_key
             };
-            actor.openRequest(form, downstream, function(msg) {
-              console.log(form);
+            Slide.VendorUser.createRelationship({
+              publicKey: user.public_key
+            }, self.vendor, function(vendorUser) {
+              console.log(vendorUser);
+              actor.openRequest({
+                form: form, vendorUser: vendorUser.uuid
+              }, downstream, function(msg) {
+                console.log(form);
+              });
             });
           });
         });
