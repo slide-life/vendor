@@ -403,7 +403,7 @@ Form.prototype.getUserData = function () {
   this.$form.find('.card-wrapper').each(function (card) {
     var key = $(this).find('.card .card-header .field-input').data('slide-identifier');
     $(this).find('.card:not(.slick-cloned, .new-field) .card-subfields').each(function () {
-      if (!deepCompare(fields, {})) {
+      if (!deepCompare(self.fields, {})) {
         cardData[key] = cardData[key] || [];
         cardData[key].push(self._getFieldsInElement($(this)));
       }

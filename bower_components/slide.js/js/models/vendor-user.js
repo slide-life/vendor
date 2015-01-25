@@ -42,6 +42,8 @@ VendorUser.persist = function(vendorUser) {
 
 VendorUser.createRelationship = function(user, vendor, cb) {
   var key = Crypto.AES.generateKey();
+  var userSym = user.key;
+  console.log(user);
   var userKey = Crypto.AES.encryptKey(key, user.publicKey);
   var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
   var checksum = Crypto.encrypt('', user.publicKey);
@@ -63,14 +65,6 @@ VendorUser.createRelationship = function(user, vendor, cb) {
       var vendorUser = new VendorUser(resp.uuid);
       vendorUser.fromObject(resp);
       // VendorUser.persist(vendorUser);
-      // TODO: NB: venedor users are overwritten, not appended
-      API.patch('/users/' + user.number + '/profile', {
-        data: {
-          patch: {_vendor_users: JSON.stringify([resp.uuid])}
-        }, success: function(profile) {
-          console.log(profile);
-        }
-      });
       if (cb) { cb(vendorUser); }
     }
   });

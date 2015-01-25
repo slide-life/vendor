@@ -122,26 +122,37 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
           fields: self.transformFields(fields),
           responses: responses
         });
-        console.log(fields, template);
         self.$page.html(template);
       });
     });
   }
 
   SlideVendor.prototype.getResponsesForForm = function (form, cb) {
+    var self = this;
     Slide.VendorForm.get(this.vendor, form.id, function(form) {
       var responses = [];
-      for (var uuid in form.responses) {
-        if (form.responses[uuid]) {
-          new Slide.VendorUser(uuid).load(function(user) {
-            var key = Slide.crypto.decrypt(user.vendor_key,
-              vendor.privateKey);
-            var fields = Slide.crypto.AES.decryptData(form.responses[uuid], key);
-            responses.push({ user: user, fields: fields });
-          });
+
+      if (Object.keys(form.responses).length === 0) {
+        cb([]);
+      } else {
+        for (var uuid in form.responses) {
+          if (form.responses[uuid]) {
+            new Slide.VendorUser(uuid).load(function(user) {
+              var key = Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
+              var fields = Slide.Crypto.AES.decryptData(form.responses[uuid], key);
+              var clean = {};
+              for( var k in fields ) {
+                clean[k.replace(/\//g, '.')] = fields[k];
+              }
+              responses.push(clean);
+              if (responses.length === Object.keys(form.responses).length) {
+                console.log(responses);
+                cb(responses);
+              }
+            });
+          }
         }
       }
-      cb(responses);
     });
   };
 
@@ -224,11 +235,9 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
               publicKey: user.public_key,
               number: user.number
             }, self.vendor, function (vendorUser) {
-              console.log(form);
               actor.openRequest({
                 form: form, vendorUser: vendorUser.uuid
               }, downstream, function (msg) {
-                console.log(form);
               });
             });
           });

@@ -32469,7 +32469,7 @@ return require('js/forge');
     };
 
 }));
-;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+;;(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 "use strict";
 var API = require("../utils/api")["default"];
 var Crypto = require("../utils/crypto")["default"];
@@ -32933,6 +32933,7 @@ exports["default"] = Securable;
 var API = require("../utils/api")["default"];
 var Storage = require("../utils/storage")["default"];
 var Securable = require("./securable")["default"];
+var Crypto = require("../utils/crypto")["default"];
 
 var User = function(number, pub, priv, key) {
   this.number = number;
@@ -33011,10 +33012,14 @@ User.prototype.loadRelationships = function(success) {
   var self = this;
   API.get('/users/' + this.number + '/vendor_users', {
     success: function (data) {
-      /*var uuids = encryptedUuids.map(function(encryptedUuid) {
-        return self.decryptData(encryptedUuid);
-      });*/
-      var encryptedUuids = data;
+      var uuids = Crypto.AES.decrypt(data, self.symmetricKey);
+      console.log(uuids);
+      var encryptedUuids;
+      try {
+        encryptedUuids = JSON.parse(uuids || '[]');
+      } catch(e) {
+        encryptedUuids = uuids;
+      }
       var vendorUsers = encryptedUuids.map(function(uuid) {
         return new Slide.VendorUser(uuid);
       });
@@ -33094,6 +33099,17 @@ User.register = function(number, cb, fail) {
   });
 };
 
+User.prototype.addRequest = function(uuid) {
+  // TODO: NB: vendor users are overwritten, not appended
+  API.patch('/users/' + this.number + '/profile', {
+    data: {
+      patch: {_vendor_users: Crypto.AES.encrypt(JSON.stringify([uuid]), this.symmetricKey)}
+    }, success: function(profile) {
+      console.log(profile);
+    }
+  });
+};
+
 User.prototype.getProfile = function(cb) {
   var self = this;
   API.get('/users/' + this.number + '/profile', {
@@ -33136,7 +33152,7 @@ User.prototype.requestPrivateKey = function(cb) {
 
 
 exports["default"] = User;
-},{"../utils/api":10,"../utils/storage":12,"./securable":4}],6:[function(require,module,exports){
+},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./securable":4}],6:[function(require,module,exports){
 "use strict";
 var API = require("../utils/api")["default"];
 
@@ -33221,6 +33237,8 @@ VendorUser.persist = function(vendorUser) {
 
 VendorUser.createRelationship = function(user, vendor, cb) {
   var key = Crypto.AES.generateKey();
+  var userSym = user.key;
+  console.log(user);
   var userKey = Crypto.AES.encryptKey(key, user.publicKey);
   var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
   var checksum = Crypto.encrypt('', user.publicKey);
@@ -33242,14 +33260,6 @@ VendorUser.createRelationship = function(user, vendor, cb) {
       var vendorUser = new VendorUser(resp.uuid);
       vendorUser.fromObject(resp);
       // VendorUser.persist(vendorUser);
-      // TODO: NB: venedor users are overwritten, not appended
-      API.patch('/users/' + user.number + '/profile', {
-        data: {
-          patch: {_vendor_users: JSON.stringify([resp.uuid])}
-        }, success: function(profile) {
-          console.log(profile);
-        }
-      });
       if (cb) { cb(vendorUser); }
     }
   });
@@ -34234,7 +34244,7 @@ Form.prototype.getUserData = function () {
   this.$form.find('.card-wrapper').each(function (card) {
     var key = $(this).find('.card .card-header .field-input').data('slide-identifier');
     $(this).find('.card:not(.slick-cloned, .new-field) .card-subfields').each(function () {
-      if (!deepCompare(fields, {})) {
+      if (!deepCompare(self.fields, {})) {
         cardData[key] = cardData[key] || [];
         cardData[key].push(self._getFieldsInElement($(this)));
       }
@@ -34265,4 +34275,5 @@ Form.prototype.getStringifiedPatchedUserData = function () {
 };
 
 exports["default"] = Form;
-},{"../models/block":2}]},{},[9]);
+},{"../models/block":2}]},{},[9])
+;

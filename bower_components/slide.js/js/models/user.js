@@ -1,6 +1,7 @@
 import API from '../utils/api';
 import Storage from '../utils/storage';
 import Securable from './securable';
+import Crypto from '../utils/crypto';
 
 var User = function(number, pub, priv, key) {
   this.number = number;
@@ -79,10 +80,14 @@ User.prototype.loadRelationships = function(success) {
   var self = this;
   API.get('/users/' + this.number + '/vendor_users', {
     success: function (data) {
-      /*var uuids = encryptedUuids.map(function(encryptedUuid) {
-        return self.decryptData(encryptedUuid);
-      });*/
-      var encryptedUuids = data;
+      var uuids = Crypto.AES.decrypt(data, self.symmetricKey);
+      console.log(uuids);
+      var encryptedUuids;
+      try {
+        encryptedUuids = JSON.parse(uuids || '[]');
+      } catch(e) {
+        encryptedUuids = uuids;
+      }
       var vendorUsers = encryptedUuids.map(function(uuid) {
         return new Slide.VendorUser(uuid);
       });
@@ -158,6 +163,17 @@ User.register = function(number, cb, fail) {
     },
     failure: function(error) {
       fail(error);
+    }
+  });
+};
+
+User.prototype.addRequest = function(uuid) {
+  // TODO: NB: vendor users are overwritten, not appended
+  API.patch('/users/' + this.number + '/profile', {
+    data: {
+      patch: {_vendor_users: Crypto.AES.encrypt(JSON.stringify([uuid]), this.symmetricKey)}
+    }, success: function(profile) {
+      console.log(profile);
     }
   });
 };
