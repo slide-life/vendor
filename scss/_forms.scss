@@ -1,0 +1,40 @@
+@import 'base';
+
+.add-form {
+  display: none;
+  padding-bottom: 22px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid $medium-grey;
+}
+
+.add-form-header {
+  margin-bottom: 16px;
+}
+
+.add-form-input-group {
+  margin-bottom: 12px;
+  overflow: hidden;
+  line-height: 39px;
+}
+
+.add-form-label {
+  width: 120px;
+  margin-right: 12px;
+  text-align: right;
+  display: block;
+  float: left;
+}
+
+.add-form-input {
+  border: none;
+  float: left;
+  padding: 8px;
+  border: 1px solid $medium-grey;
+  border-radius: 4px;
+  width: 240px;
+  font-size: 14px;
+}
+
+.add-form-submit {
+  margin-left: 132px;
+}

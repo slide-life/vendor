@@ -125,10 +125,9 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
         self.$page.html(template);
       });
     });
-  }
+  };
 
   SlideVendor.prototype.getResponsesForForm = function (form, cb) {
-    var self = this;
     Slide.VendorForm.get(this.vendor, form.id, function(form) {
       var responses = [];
 
@@ -138,7 +137,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
         for (var uuid in form.responses) {
           if (form.responses[uuid]) {
             new Slide.VendorUser(uuid).load(function(user) {
-              var key = Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
+              var key = Slide.Crypto.uglyPayload('1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=');
               var fields = Slide.Crypto.AES.decryptData(form.responses[uuid], key);
               var clean = {};
               for( var k in fields ) {
@@ -197,14 +196,20 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
   SlideVendor.prototype.initializeFormListeners = function () {
     var self = this;
 
-    $(document).on('click', '.new-form', function () {
-      var representation = prompt('Input the fields for your forms').split('|');
-      var name = representation[0];
-      var description = representation[1];
-      var fields = representation[2].split(',').map(function (field) {
+    $(document).on('click', '.add-new-form', function () {
+      var $wrapper = $('.add-form');
+      $wrapper.slideToggle();
+    });
+
+    $(document).on('click', '.add-form-submit', function () {
+      var $wrapper = $('.add-form');
+      var name = $wrapper.find('#add-form-name').val();
+      var description = $wrapper.find('#add-form-description').val();
+      var fields = $wrapper.find('#add-form-fields').val().split(',').map(function (field) {
         return field.trim();
       });
 
+      $wrapper.slideToggle();
       self.createForm(name, description, fields, function (form) {
         form.form_fields = form.fields;
         self.data.forms.push(form);

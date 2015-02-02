@@ -1,6 +1,24 @@
 <div class="page-control form-control">
+  <div class="add-form">
+    <h4 class="add-form-header">Create new form</h4>
+    <div class="add-form-input-group">
+      <label class="add-form-label" for="add-form-name">Name</label>
+      <input class="add-form-input" id="add-form-name">
+    </div>
+    <div class="add-form-input-group">
+      <label class="add-form-label" for="add-form-description">Description</label>
+      <input class="add-form-input" id="add-form-description">
+    </div>
+    <div class="add-form-input-group">
+      <label class="add-form-label" for="add-form-fields">Fields</label>
+      <input class="add-form-input" id="add-form-fields">
+    </div>
+    <div>
+      <button class="control add-form-submit"><span class="glyphicon glyphicon-plus"></span> Create form</button>
+    </div>
+  </div>
   <div class="download-controls">
-    <button class="control new-form"><span class="glyphicon glyphicon-plus"></span> Create new form</button>
+    <button class="control add-new-form"><span class="glyphicon glyphicon-plus"></span> Create new form</button>
   </div>
 </div>
 {{#each this}}
