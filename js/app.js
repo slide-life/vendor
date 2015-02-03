@@ -91,25 +91,43 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
   };
 
   SlideVendor.prototype.getUsers = function (cb) {
-    // self.vendor.getProfile(function(profile) {
-    //   self.loadResponses(profile._responses, function (responses) {
-    //     console.log(profile);
-    //     console.log(responses);
-    //   });
-    // });
-    // var self = this;
-    // for (var uuid in responses) {
-    //   if (responses[uuid]) {
-    //     new Slide.VendorUser(uuid).load(function(user) {
-    //       // var key = Slide.Crypto.decryptString(Slide.Crypto.uglyPayload(user.vendor_key),
-    //       //  self.vendor.privateKey);
-    //       var fields = Slide.Crypto.AES.decryptData(responses[uuid]._latest_profile, Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c="));
-    //       cb(fields);
-    //     });
-    //   }
-    // }
     this.vendor.getUsers(function (users) {
       cb(users);
+    });
+  };
+
+  SlideVendor.prototype.getCSVFromResponses = function (fields, responses) {
+    var header = [];
+    $.each(fields, function (identifier, field) {
+      header.push(field._description);
+    });
+
+    var rows = responses.map(function (response) {
+      var row = [];
+      $.each(fields, function (identifier, field) {
+        row.push(response[identifier] || '');
+      });
+      return row;
+    });
+
+    var csv = [header].concat(rows);
+    return csv.map(function (row) {
+      return row.join(',');
+    }).join('\n');
+  };
+
+  SlideVendor.prototype.bindDownloadListeners = function (fields, responses) {
+    var self = this;
+    this.$page.find('.download-all').on('click', function () {
+      var csv = self.getCSVFromResponses(fields, responses);
+
+      var a = document.createElement('a');
+      a.href = 'data:attachment/csv,' + encodeURIComponent(csv);
+      a.target = '_blank';
+      a.download = 'responses.csv';
+
+      document.body.appendChild(a);
+      a.click();
     });
   };
 
@@ -118,11 +136,12 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     this.getResponsesForForm(form, function (responses) {
       var identifiers = form.form_fields;
       Slide.Block.getFlattenedFieldsForIdentifiers(identifiers, function (fields) {
-        var template = Handlebars.partials['forms-table']({
+        var template = Handlebars.partials['form']({
           fields: self.transformFields(fields),
           responses: responses
         });
         self.$page.html(template);
+        self.bindDownloadListeners(fields, responses);
       });
     });
   };
@@ -145,7 +164,6 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
               }
               responses.push(clean);
               if (responses.length === Object.keys(form.responses).length) {
-                console.log(responses);
                 cb(responses);
               }
             });

@@ -14,6 +14,13 @@ Handlebars.registerPartial("form-list", Handlebars.template({"compiler":[6,">= 2
     + "</div>\n  <div class=\"form-controls\">\n    <button class=\"control send-to-users\" data-toggle=\"modal\" data-target=\"#send-to-users-modal\"><span class=\"glyphicon glyphicon-send\"></span> Send to users</button>\n    <button class=\"control view-responses\"><span class=\"glyphicon glyphicon glyphicon-inbox\"></span> View responses</button>\n  </div>\n</div>\n";
 },"useData":true}));
 
+Handlebars.registerPartial("form", Handlebars.template({"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
+  var stack1, buffer = "<div class=\"page-control\">\n  <div class=\"filter-controls\">\n    <button class=\"control\"><span class=\"icon icon-filter\"></span>Filter updates</button>\n  </div>\n  <div class=\"download-controls\">\n    <button class=\"control download-updated\"><span class=\"icon icon-download-updated\"></span>Download updated</button>\n    <button class=\"control download-all\"><span class=\"icon icon-download\"></span>Download all</button>\n  </div>\n</div>\n";
+  stack1 = this.invokePartial(partials['forms-table'], '', 'forms-table', depth0, undefined, helpers, partials, data);
+  if (stack1 != null) { buffer += stack1; }
+  return buffer;
+},"usePartial":true,"useData":true}));
+
 Handlebars.registerPartial("forms-table", Handlebars.template({"1":function(depth0,helpers,partials,data) {
   var helper, functionType="function", helperMissing=helpers.helperMissing, escapeExpression=this.escapeExpression;
   return "        <td>"
@@ -79,15 +86,6 @@ Handlebars.registerPartial("users-table", Handlebars.template({"1":function(dept
 },"usePartial":true,"useData":true,"useDepths":true}));
 
 this["SlideVendorTemplates"] = this["SlideVendorTemplates"] || {};
-
-this["SlideVendorTemplates"]["form"] = Handlebars.template({"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
-  var stack1, buffer = "<div class=\"page-control\">\n  <div class=\"filter-controls\">\n    <button class=\"control\"><span class=\"icon icon-filter\"></span>Filter updates</button>\n  </div>\n  <div class=\"download-controls\">\n    <button class=\"control\"><span class=\"icon icon-download-updated\"></span>Download updated</button>\n    <button class=\"control\"><span class=\"icon icon-download\"></span>Download all</button>\n  </div>\n</div>\n";
-  stack1 = this.invokePartial(partials['forms-table'], '', 'forms-table', depth0, undefined, helpers, partials, data);
-  if (stack1 != null) { buffer += stack1; }
-  return buffer;
-},"usePartial":true,"useData":true});
-
-
 
 this["SlideVendorTemplates"]["forms"] = Handlebars.template({"1":function(depth0,helpers,partials,data) {
   var stack1, buffer = "";
