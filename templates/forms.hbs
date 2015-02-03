@@ -1,4 +1,4 @@
-<div class="page-control form-control">
+<div class="page-control form-control-wrapper">
   <div class="add-form">
     <h4 class="add-form-header">Create new form</h4>
     <div class="add-form-input-group">
@@ -31,3 +31,21 @@
     </div>
   </div>
 {{/each}}
+
+<!-- Modal -->
+<div class="modal fade" id="send-to-users-modal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Send to users</h4>
+      </div>
+      <div class="modal-body">
+        <input type="text" class="form-control numbers" id="numbers" placeholder="List of user numbers (comma separated)">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary send" data-dismiss="modal">Send</button>
+      </div>
+    </div>
+  </div>
+</div>

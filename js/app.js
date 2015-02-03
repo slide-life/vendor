@@ -222,27 +222,30 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       self.showResponsesForForm(form);
     });
 
-
     $(document).on('click', '.send-to-users', function () {
       var form = self.getFormById($(this).parents('.form-list-item').data('form'));
-      var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
-        return number.trim();
-      });
+      var $modal = $('#send-to-users-modal');
 
-      numbers.forEach(function (number) {
-        var user = new Slide.User(number);
-        user.get(function(user) {
-          new Slide.Actor(ORGANISATION).initialize(function(actor) {
-            var downstream = {
-              type: 'user', downstream: number, key: user.public_key
-            };
-            Slide.VendorUser.createRelationship({
-              publicKey: user.public_key,
-              number: user.number
-            }, self.vendor, function (vendorUser) {
-              actor.openRequest({
-                form: form, vendorUser: vendorUser.uuid
-              }, downstream, function (msg) {
+      $modal.on('click', '.send', function () {
+        var numbers = $modal.find('.numbers').val().split(',').map(function (number) {
+          return number.trim();
+        });
+
+        numbers.forEach(function (number) {
+          var user = new Slide.User(number);
+          user.get(function(user) {
+            new Slide.Actor(ORGANISATION).initialize(function(actor) {
+              var downstream = {
+                type: 'user', downstream: number, key: user.public_key
+              };
+              Slide.VendorUser.createRelationship({
+                publicKey: user.public_key,
+                number: user.number
+              }, self.vendor, function (vendorUser) {
+                actor.openRequest({
+                  form: form, vendorUser: vendorUser.uuid
+                }, downstream, function (msg) {
+                });
               });
             });
           });

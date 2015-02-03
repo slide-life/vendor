@@ -1,9 +1,7 @@
 <div class="form-list-item" data-form={{id}}>
-  <div class="filter-controls">
-    {{name}}
-  </div>
-  <div class="download-controls">
-    <button class="control send-to-users"><span class="glyphicon glyphicon-send"></span> Send to users</button>
+  <div class="form-name">{{name}}</div>
+  <div class="form-controls">
+    <button class="control send-to-users" data-toggle="modal" data-target="#send-to-users-modal"><span class="glyphicon glyphicon-send"></span> Send to users</button>
     <button class="control view-responses"><span class="glyphicon glyphicon glyphicon-inbox"></span> View responses</button>
   </div>
 </div>

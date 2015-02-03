@@ -61,13 +61,12 @@ button {
   cursor: pointer;
 }
 
-.form-control {
+.form-control-wrapper {
   margin-bottom: 16px;
 }
 
 .form-list-item {
   @extend .page-control;
-  line-height: 35px;
   margin-bottom: 12px;
   border-top: 1px solid $medium-grey;
 }
