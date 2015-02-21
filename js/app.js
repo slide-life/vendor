@@ -9,7 +9,10 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 /* App */
 
 (function($) {
-  var ORGANISATION = 'The COOP';
+  var NAME = 'The COOP';
+  var DOMAIN = 'thecoop.com';
+  var SCHEMA = {
+  };
 
   var SlideVendor = function () {
     var self = this;
@@ -26,43 +29,83 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 
     /* Vendor login */
     this.loginOrRegister(function () {
-      self.updatePage(self.$sidebar.find('.link.active').data('target'));
+      self.displayVendor();
+      self.runTestsAndMocks(function () {
+        self.updatePage(self.$sidebar.find('.link.active').data('target'));
+      });
     });
     this.initializeListeners();
   };
 
-
-  SlideVendor.prototype.loginOrRegister = function (cb) {
-    var self = this;
-    Slide.Vendor.load(function (next) {
-      Slide.Vendor.invite(ORGANISATION, function (vendor) {
-        vendor.register(function (vendor) {
-          vendor.persist();
-          next(vendor);
-        });
-      });
-    }, function (vendor) {
-      self.vendor = vendor;
-      self.$header.find('.user').html(Handlebars.partials.account(vendor));
-      cb();
-    });
+  SlideVendor.prototype.runTestsAndMocks = function (cb) {
+    cb();
   };
 
+  SlideVendor.prototype.loadVendor = function (middleware, cb) {
+    if (localStorage.vendor) {
+      cb(Slide.Vendor.fromObject(JSON.parse(localStorage.vendor)));
+    } else {
+      middleware(cb);
+    }
+  };
+
+  SlideVendor.prototype.loginOrRegister = function (cb) { //will be replaced in final
+    var self = this;
+
+    this.loadVendor(function (next) {
+      Slide.Vendor.create(NAME, DOMAIN, SCHEMA, {
+        success: function (vendor) {
+          self.vendor = vendor;
+          self.persistVendor(self.vendor);
+          cb();
+        }
+      });
+    }, cb);
+  };
+
+  SlideVendor.prototype.persistVendor = function (vendor) {
+    localStorage.vendor = JSON.stringify(vendor.toObject());
+  };
+
+  SlideVendor.prototype.displayVendor = function () {
+    this.$header.find('.user').html(Handlebars.partials.account(this.vendor));
+  };
+
+  //tab controller
   SlideVendor.prototype.updatePage = function (target) {
     var self = this;
     if (target === 'users') {
-      this.getUsers(function (users) {
-        self.data.users = users;
-        self.$page.html(self.templates[target](users));
-      });
+      this.displayUsers(target);
     } else if (target === 'forms') {
-      this.vendor.loadForms(function (forms) {
-        self.data.forms = forms;
-        self.$page.html(self.templates[target](forms));
-      });
+      this.displayForms(target);
     } else {
       throw new Error('Invalid target: must be either users or forms');
     }
+  };
+
+  SlideVendor.prototype.render = function (target, data) {
+    this.$page.html(this.templates[target](data));
+  };
+
+  //tab views start here
+  SlideVendor.prototype.displayUsers = function (target, cb) {
+    var self = this;
+    this.vendor.getAllResponses({
+      success: function (responses) {
+        self.render(target, responses);
+      }
+    });
+  };
+
+  SlideVendor.prototype.displayForms = function (target, cb) {
+    var self = this;
+
+    this.vendor.getForms({
+      success: function (forms) {
+        self.data.forms = forms;
+        self.render(target, forms);
+      }
+    });
   };
 
   SlideVendor.prototype.addResponseToForm  = function (id, response) {
@@ -90,74 +133,27 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     return fs;
   };
 
-  SlideVendor.prototype.getUsers = function (cb) {
-    // self.vendor.getProfile(function(profile) {
-    //   self.loadResponses(profile._responses, function (responses) {
-    //     console.log(profile);
-    //     console.log(responses);
-    //   });
-    // });
-    // var self = this;
-    // for (var uuid in responses) {
-    //   if (responses[uuid]) {
-    //     new Slide.VendorUser(uuid).load(function(user) {
-    //       // var key = Slide.Crypto.decryptString(Slide.Crypto.uglyPayload(user.vendor_key),
-    //       //  self.vendor.privateKey);
-    //       var fields = Slide.Crypto.AES.decryptData(responses[uuid]._latest_profile, Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c="));
-    //       cb(fields);
-    //     });
-    //   }
-    // }
-    this.vendor.getUsers(function (users) {
-      cb(users);
-    });
-  };
-
   SlideVendor.prototype.showResponsesForForm = function (form) {
     var self = this;
     this.getResponsesForForm(form, function (responses) {
-      var identifiers = form.form_fields;
-      Slide.Block.getFlattenedFieldsForIdentifiers(identifiers, function (fields) {
+      var fields = form.fields;
+      Slide.Card.getFlattenedSchemasForFields(fields, function (schemas) {
         var template = Handlebars.partials['forms-table']({
-          fields: self.transformFields(fields),
+          fields: self.transformFields(schemas),
           responses: responses
         });
         self.$page.html(template);
       });
     });
-  }
+  };
 
   SlideVendor.prototype.getResponsesForForm = function (form, cb) {
     var self = this;
-    Slide.VendorForm.get(this.vendor, form.id, function(form) {
-      var responses = [];
-
-      if (Object.keys(form.responses).length === 0) {
-        cb([]);
-      } else {
-        for (var uuid in form.responses) {
-          if (form.responses[uuid]) {
-            new Slide.VendorUser(uuid).load(function(user) {
-              var key = Slide.Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
-              var fields = Slide.Crypto.AES.decryptData(form.responses[uuid], key);
-              var clean = {};
-              for( var k in fields ) {
-                clean[k.replace(/\//g, '.')] = fields[k];
-              }
-              responses.push(clean);
-              if (responses.length === Object.keys(form.responses).length) {
-                console.log(responses);
-                cb(responses);
-              }
-            });
-          }
-        }
-      }
-    });
+    this.vendor.getResponsesForForm(form, { success: cb });
   };
 
   SlideVendor.prototype.createForm = function (name, description, fields, cb) {
-    this.vendor.createForm(name, description, fields, cb);
+    this.vendor.createForm(name, description, fields, { success: cb });
   };
 
   SlideVendor.prototype.getFormById = function (id) {
@@ -194,55 +190,64 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     });
   };
 
+  SlideVendor.prototype.promptForNewForm = function () {
+    var self = this;
+
+    var representation = prompt('Input the fields for your forms').split('|');
+    var name = representation[0];
+    var description = representation[1];
+    var fields = representation[2].split(',').map(function (field) {
+      return field.trim();
+    });
+
+    this.createForm(name, description, fields, function (form) {
+      form.form_fields = form.fields;
+      self.data.forms.push(form);
+      self.updatePage('forms');
+    });
+  };
+
+  SlideVendor.prototype.sendFormToUsers = function (form) {
+    var self = this;
+
+    var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
+      return number.trim();
+    });
+
+    numbers.forEach(function (number) {
+      Slide.User.getByIdentifier(new Slide.Identifier.Phone(number), {
+        success: function (user) {
+          self.vendor.createRelationship(user, {
+            success: function (relationship) {
+              relationship.createConversation(form.name, {
+                success: function (conversation) {
+                  conversation.request(user, form.fields, {
+                    success: function () {
+                      console.log('requested from user', user);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+  };
+
   SlideVendor.prototype.initializeFormListeners = function () {
     var self = this;
 
-    $(document).on('click', '.new-form', function () {
-      var representation = prompt('Input the fields for your forms').split('|');
-      var name = representation[0];
-      var description = representation[1];
-      var fields = representation[2].split(',').map(function (field) {
-        return field.trim();
-      });
-
-      self.createForm(name, description, fields, function (form) {
-        form.form_fields = form.fields;
-        self.data.forms.push(form);
-        self.updatePage('forms');
-      });
-    });
+    $(document).on('click', '.new-form', this.promptForNewForm);
 
     $(document).on('click', '.view-responses', function () {
       var form = self.getFormById($(this).parents('.form-list-item').data('form'));
       self.showResponsesForForm(form);
     });
 
-
     $(document).on('click', '.send-to-users', function () {
       var form = self.getFormById($(this).parents('.form-list-item').data('form'));
-      var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
-        return number.trim();
-      });
-
-      numbers.forEach(function (number) {
-        var user = new Slide.User(number);
-        user.get(function(user) {
-          new Slide.Actor(ORGANISATION).initialize(function(actor) {
-            var downstream = {
-              type: 'user', downstream: number, key: user.public_key
-            };
-            Slide.VendorUser.createRelationship({
-              publicKey: user.public_key,
-              number: user.number
-            }, self.vendor, function (vendorUser) {
-              actor.openRequest({
-                form: form, vendorUser: vendorUser.uuid
-              }, downstream, function (msg) {
-              });
-            });
-          });
-        });
-      });
+      self.sendFormToUsers(form);
     });
   };
 
