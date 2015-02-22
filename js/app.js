@@ -37,6 +37,25 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     this.initializeListeners();
   };
 
+  SlideVendor.prototype.prompt = function (title, fields, cb) {
+    var form = fields.map(function (field) {
+      return '<label>'+field+' <input type="text" name="'+field+'" value=""></label><br />';
+    }).join('\n');
+    $.prompt({
+      state0: {
+        title: title,
+        html: form,
+        buttons: { Next: 1 },
+        //focus: "input[name='fname']",
+        submit:function(e,v,m,f){ 
+          cb(f);
+          e.preventDefault();
+          $.prompt.close();
+        }
+      }
+    });
+  };
+
   SlideVendor.prototype.runTestsAndMocks = function (cb) {
     cb();
   };
@@ -194,46 +213,50 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
   SlideVendor.prototype.promptForNewForm = function () {
     var self = this;
 
-    var representation = prompt('Input the fields for your forms').split('|');
-    var name = representation[0];
-    var description = representation[1];
-    var fields = representation[2].split(',').map(function (field) {
-      return field.trim();
-    });
+    this.prompt('Input the fields for your forms', ['name', 'description', 'fields'], function (form) {
+      var name = form.name;
+      var description = form.description;
+      var fields = form.fields.split(',').map(function (field) {
+        return field.trim();
+      });
 
-    this.createForm(name, description, fields, function (form) {
-      form.form_fields = form.fields;
-      self.data.forms.push(form);
-      self.updatePage('forms');
-    });
+      self.createForm(name, description, fields, function (form) {
+        form.form_fields = form.fields;
+        self.data.forms.push(form);
+        self.updatePage('forms');
+      });
+    })
   };
 
   SlideVendor.prototype.sendFormToUsers = function (form) {
     var self = this;
 
-    var numbers = prompt('Input the comma separated list of numbers').split(',').map(function (number) {
-      return number.trim();
-    });
-
-    numbers.forEach(function (number) {
-      Slide.User.getByIdentifier(new Slide.Identifier.Phone(number), {
-        success: function (user) {
-          self.vendor.createRelationship(user, {
-            success: function (relationship) {
-              relationship.createConversation(form.name, {
-                success: function (conversation) {
-                  conversation.request(user, form.fields, {
-                    success: function () {
-                      console.log('requested from user', user);
-                    }
-                  });
-                }
-              });
-            }
-          });
-        }
+    this.prompt('Input the comma separated list of numbers', ['numbers'], function (f) {
+      var numbers = f.numbers.split(',').map(function (number) {
+        return number.trim();
       });
-    });
+
+      numbers.forEach(function (number) {
+        Slide.User.getByIdentifier(new Slide.Identifier.Phone(number), {
+          success: function (user) {
+            self.vendor.createRelationship(user, {
+              success: function (relationship) {
+                relationship.createConversation(form.name, {
+                  success: function (conversation) {
+                    conversation.request(user, form.fields, {
+                      success: function () {
+                        console.log('requested from user', user);
+                      }
+                    });
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+
+    })
   };
 
   SlideVendor.prototype.initializeFormListeners = function () {

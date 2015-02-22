@@ -12,6 +12,7 @@
   "dependencies": {
     "jquery": "~2.1.3",
     "slide.js": "git@github.com:slide-life/slide.js",
+    "imprompt": "https://github.com/trentrichardson/jQuery-Impromptu.git",
     "handlebars": "~2.0.0"
   }
 }
