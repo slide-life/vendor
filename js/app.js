@@ -1,8 +1,16 @@
 /* Handlebars helpers */
 
+function fetch (struct, path) {
+  console.log(struct, path);
+  if (path.length == 1) return struct[0][path[0]];
+  else return fetch(struct[path[0]], path.slice(1));
+}
+
 Handlebars.registerHelper('buildResponseRow', function(response, fields, options) {
   return fields.reduce(function (acc, field) {
-    return acc + options.fn({ data: response[field.identifier], identifier: field.identifier });
+    var parts = field.identifier.split(':');
+    var path = [parts[0]].concat(parts[1].split('.'));
+    return acc + options.fn({ data: fetch(response, path), identifier: field.identifier });
   }, '');
 });
 
@@ -160,7 +168,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       Slide.Card.getFlattenedSchemasForFields(fields, function (schemas) {
         var template = Handlebars.partials['forms-table']({
           fields: self.transformFields(schemas),
-          responses: responses
+          responses: responses.responses
         });
         self.$page.html(template);
       });
