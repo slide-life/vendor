@@ -43,7 +43,8 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
 
   SlideVendor.prototype.loadVendor = function (middleware, cb) {
     if (localStorage.vendor) {
-      cb(Slide.Vendor.fromObject(JSON.parse(localStorage.vendor)));
+      this.vendor = Slide.Vendor.fromObject(JSON.parse(localStorage.vendor));
+      cb(this.vendor);
     } else {
       middleware(cb);
     }
@@ -57,7 +58,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
         success: function (vendor) {
           self.vendor = vendor;
           self.persistVendor(self.vendor);
-          cb();
+          next();
         }
       });
     }, cb);
@@ -238,7 +239,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
   SlideVendor.prototype.initializeFormListeners = function () {
     var self = this;
 
-    $(document).on('click', '.new-form', this.promptForNewForm);
+    $(document).on('click', '.new-form', this.promptForNewForm.bind(this));
 
     $(document).on('click', '.view-responses', function () {
       var form = self.getFormById($(this).parents('.form-list-item').data('form'));
