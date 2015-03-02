@@ -2,6 +2,7 @@ import API from '../utils/api';
 import Crypto from '../utils/crypto';
 import Storage from '../utils/storage';
 import VendorForm from './vendor-form';
+import VendorUser from './vendor-user';
 import User from './user';
 
 var Vendor = function (name, chk, id, keys) {
@@ -30,7 +31,7 @@ Vendor.prototype.persist = function () {
 };
 
 Vendor.fromObject = function (obj) {
-  var keys = { pub: obj.publicKey, priv: obj.privateKey, sym: obj.symmetricKey };
+  var keys = { pub: obj.publicKey || obj.public_key, priv: obj.privateKey, sym: obj.symmetricKey };
   var vendor;
   if( keys.pub || keys.priv || keys.sym ) {
     vendor = new Vendor(obj.name, obj.checksum, obj.id, keys);
@@ -38,7 +39,20 @@ Vendor.fromObject = function (obj) {
     vendor = new Vendor(obj.name, obj.checksum, obj.id);
   }
   vendor.invite = obj.invite_code;
+
+  if (obj.signup_form) {
+    vendor.signupForm = VendorForm.fromObject(obj.signup_form);
+  }
+
   return vendor;
+};
+
+Vendor.all = function (cb) {
+  API.get('/vendors', {
+    success: function (vendors) {
+      cb(vendors.map(Vendor.fromObject));
+    }
+  });
 };
 
 Vendor.load = function (fail, success) {
@@ -80,9 +94,9 @@ Vendor.prototype.register = function (cb) {
 };
 
 Vendor.prototype.listen = function (cb) {
-  var socket = API.socket('ws://', '/vendors/' + this.number + '/listen');
+  var socket = API.socket('/vendors/' + this.id + '/listen');
   socket.onmessage = function (event) {
-    cb();
+    cb(event.data);
   };
 };
 
@@ -122,6 +136,41 @@ Vendor.prototype.getUsers = function(success, fail) {
     data: { checksum: this.prettyChecksum() },
     success: function(x) { success(x); },
     fail: function(x) { fail(x); }
+  });
+};
+
+Vendor.prototype.getKeyForVendorUser = function (vendorUser) {
+  return this.decrypt(vendorUser.vendor_key);
+};
+
+Vendor.prototype.getResponsesForForm = function (form, cb) {
+  var self = this;
+  VendorForm.get(self, form.id, function (vendorForm) {
+    var deferreds = [];
+    var responses = [];
+
+    for (var uuid in vendorForm.responses) {
+      var userResponses = vendorForm.responses[uuid];
+      var deferred = new $.Deferred();
+      deferreds.push(deferred);
+
+      new VendorUser(uuid).load(function (vendorUser) {
+        var key = self.getKeyForVendorUser(vendorUser);
+        var fields = Crypto.AES.decryptData(userResponses, key);
+
+        var clean = {};
+        for (var k in fields) {
+          clean[k.replace(/\//g, '.')] = fields[k];
+        }
+
+        responses.push({ user: vendorUser, fields: clean });
+        deferred.resolve();
+      });
+
+      $.when.apply($, deferreds).done(function () {
+        cb(responses);
+      });
+    }
   });
 };
 

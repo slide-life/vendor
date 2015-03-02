@@ -4,15 +4,18 @@ import Crypto from '../utils/crypto';
 var Conversation = function(upstream, downstream, cb, key) {
   // NB. The fourth argument, key, is used in forming a form conversation.
   this.symmetricKey = key || Crypto.AES.generateKey();
-  this.symmetricKey = Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
-  this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
+  if (downstream.key) {
+    this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
+  } else {
+    //TODO: this.key just becomes this.symmetricKey if none
+    this.key = this.symmetricKey;
+  }
   this.upstream_type = upstream.type;
   this.downstream_type = downstream.type;
   var device = downstream.type === 'user' ? 'downstream_number' : 'downstream_id';
   var upDevice = upstream.type === 'user' ? 'upstream_number' : 'upstream_id';
   this[device] = downstream.downstream;
   this[upDevice] = upstream.upstream;
-  console.log(this, downstream);
   this.initialize(function(conversation) {
     cb(conversation);
   });
@@ -66,9 +69,10 @@ Conversation.prototype.deposit = function (fields) {
   });
 };
 
-Conversation.prototype.respond = function(fields) {
+Conversation.prototype.respond = function(fields, cb) {
   API.put('/conversations/' + this.id, {
-    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) }
+    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) },
+    success: cb
   });
 };
 
@@ -76,7 +80,7 @@ Conversation.prototype.submit = function(uuid, fields) {
   var enc = Crypto.AES.encryptData(fields, this.symmetricKey);
   var payload = {};
   payload[uuid] = enc;
-  API.put('/conversations/' + this.id, {
+  API.post('/conversations/' + this.id + '/deposit_content', {
     data: { fields: payload, patch: payload, conversation: this.id }
   });
 };

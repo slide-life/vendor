@@ -60,6 +60,23 @@ Actor.prototype.openConversation = function (downstream, onCreate, onMessage) {
   });
 };
 
+Actor.prototype.openConversationWithKey = function (key, downstream, onCreate, onMessage) {
+  var self = this;
+  this.initialize(function (actor) {
+    self.id = actor.id;
+    self.listen(function (fields) {
+      // TODO: Propogate UI updates
+      onMessage(fields);
+    });
+
+    var conversation = new Conversation({
+      upstream: self.id,
+      type: 'actor'
+    }, downstream, onCreate, key);
+    self.symmetricKey = conversation.symmetricKey;
+  });
+};
+
 Actor.prototype.getId = function () {
   return this.id;
 };

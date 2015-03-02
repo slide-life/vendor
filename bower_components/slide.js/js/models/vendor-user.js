@@ -43,7 +43,6 @@ VendorUser.persist = function(vendorUser) {
 VendorUser.createRelationship = function(user, vendor, cb) {
   var key = Crypto.AES.generateKey();
   var userSym = user.key;
-  console.log(user);
   var userKey = Crypto.AES.encryptKey(key, user.publicKey);
   var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
   var checksum = Crypto.encrypt('', user.publicKey);

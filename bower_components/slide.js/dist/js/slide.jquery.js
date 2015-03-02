@@ -28532,7 +28532,7 @@ return require('js/forge');
 * http://github.com/RobinHerbots/jquery.inputmask
 * Copyright (c) 2010 - 2015 Robin Herbots
 * Licensed under the MIT license (http://www.opensource.org/licenses/mit-license.php)
-* Version: 3.1.57
+* Version: 3.1.59
 */
 !function(factory) {
     "function" == typeof define && define.amd ? define([ "jquery" ], factory) : factory(jQuery);
@@ -29305,7 +29305,7 @@ return require('js/forge');
                 var pend = pos.end;
                 pos.end = pos.begin, pos.begin = pend;
             }
-            if (k == $.inputmask.keyCode.BACKSPACE && (pos.end - pos.begin < 1 || 0 == opts.insertMode) ? pos.begin = seekPrevious(pos.begin) : k == $.inputmask.keyCode.DELETE && pos.begin == pos.end && pos.end++, 
+            if (k == $.inputmask.keyCode.BACKSPACE && (pos.end - pos.begin < 1 || 0 == opts.insertMode) ? pos.begin = seekPrevious(pos.begin) : k == $.inputmask.keyCode.DELETE && pos.begin == pos.end && (pos.end = isMask(pos.end) ? pos.end + 1 : seekNext(pos.end) + 1), 
             stripValidPositions(pos.begin, pos.end, !1, strict), strict !== !0) {
                 generalize();
                 var lvp = getLastValidPosition(pos.begin);
@@ -29320,7 +29320,7 @@ return require('js/forge');
             opts.showTooltip && $input.prop("title", getMaskSet().mask)) : k == $.inputmask.keyCode.END || k == $.inputmask.keyCode.PAGE_DOWN ? setTimeout(function() {
                 var caretPos = seekNext(getLastValidPosition());
                 opts.insertMode || caretPos != getMaskLength() || e.shiftKey || caretPos--, caret(input, e.shiftKey ? pos.begin : caretPos, caretPos);
-            }, 0) : k == $.inputmask.keyCode.HOME && !e.shiftKey || k == $.inputmask.keyCode.PAGE_UP ? caret(input, 0, e.shiftKey ? pos.begin : 0) : opts.undoOnEscape && k == $.inputmask.keyCode.ESCAPE || 90 == k && e.ctrlKey ? (checkVal(input, !0, !1, undoValue.split("")), 
+            }, 0) : k == $.inputmask.keyCode.HOME && !e.shiftKey || k == $.inputmask.keyCode.PAGE_UP ? caret(input, 0, e.shiftKey ? pos.begin : 0) : (opts.undoOnEscape && k == $.inputmask.keyCode.ESCAPE || 90 == k && e.ctrlKey) && e.altKey !== !0 ? (checkVal(input, !0, !1, undoValue.split("")), 
             $input.click()) : k != $.inputmask.keyCode.INSERT || e.shiftKey || e.ctrlKey ? 0 != opts.insertMode || e.shiftKey || (k == $.inputmask.keyCode.RIGHT ? setTimeout(function() {
                 var caretPos = caret(input);
                 caret(input, caretPos.begin);
@@ -29328,7 +29328,7 @@ return require('js/forge');
                 var caretPos = caret(input);
                 caret(input, isRTL ? caretPos.begin + 1 : caretPos.begin - 1);
             }, 0)) : (opts.insertMode = !opts.insertMode, caret(input, opts.insertMode || pos.begin != getMaskLength() ? pos.begin : pos.begin - 1)), 
-            ignorable = -1 != $.inArray(k, opts.ignorables);
+            opts.onKeyDown.call(this, e, getBuffer(), caret(input).begin, opts), ignorable = -1 != $.inArray(k, opts.ignorables);
         }
         function keypressEvent(e, checkval, writeOut, strict, ndx) {
             var input = this, $input = $(input), k = e.which || e.charCode || e.keyCode;
@@ -29375,10 +29375,6 @@ return require('js/forge');
                 e.preventDefault();
             }
         }
-        function keyupEvent(e) {
-            var buffer = ($(this), e.keyCode, getBuffer());
-            opts.onKeyUp.call(this, e, buffer, opts);
-        }
         function pasteEvent(e) {
             var input = this, $input = $(input), inputValue = input._valueGet(!0), caretPos = caret(input);
             if ("propertychange" == e.type && input._valueGet().length <= getMaskLength()) return !0;
@@ -29388,7 +29384,12 @@ return require('js/forge');
                 valueAfterCaret == getBufferTemplate().slice(caretPos.end).join("") && (valueAfterCaret = ""), 
                 window.clipboardData && window.clipboardData.getData ? inputValue = valueBeforeCaret + window.clipboardData.getData("Text") + valueAfterCaret : e.originalEvent && e.originalEvent.clipboardData && e.originalEvent.clipboardData.getData && (inputValue = valueBeforeCaret + e.originalEvent.clipboardData.getData("text/plain") + valueAfterCaret);
             }
-            var pasteValue = $.isFunction(opts.onBeforePaste) ? opts.onBeforePaste.call(input, inputValue, opts) || inputValue : inputValue;
+            var pasteValue = inputValue;
+            if ($.isFunction(opts.onBeforePaste)) {
+                if (pasteValue = opts.onBeforePaste.call(input, inputValue, opts), pasteValue === !1) return e.preventDefault(), 
+                !1;
+                pasteValue || (pasteValue = inputValue);
+            }
             return checkVal(input, !0, !1, isRTL ? pasteValue.split("").reverse() : pasteValue.split("")), 
             $input.click(), isComplete(getBuffer()) === !0 && $input.trigger("complete"), !1;
         }
@@ -29446,8 +29447,9 @@ return require('js/forge');
                     var $input = $(this), input = this;
                     if ($input.data("_inputmask")) {
                         var nptValue = input._valueGet(), buffer = getBuffer().slice();
-                        firstClick = !0, undoValue != buffer.join("") && ($input.change(), undoValue = buffer.join("")), 
-                        "" != nptValue && (opts.clearMaskOnLostFocus && (nptValue == getBufferTemplate().join("") ? buffer = [] : clearOptionalTail(buffer)), 
+                        firstClick = !0, undoValue != buffer.join("") && setTimeout(function() {
+                            $input.change(), undoValue = buffer.join("");
+                        }, 0), "" != nptValue && (opts.clearMaskOnLostFocus && (nptValue == getBufferTemplate().join("") ? buffer = [] : clearOptionalTail(buffer)), 
                         isComplete(buffer) === !1 && ($input.trigger("incomplete"), opts.clearIncomplete && (resetMaskSet(), 
                         buffer = opts.clearMaskOnLostFocus ? [] : getBufferTemplate().slice())), writeBuffer(input, buffer, void 0, e));
                     }
@@ -29487,7 +29489,7 @@ return require('js/forge');
                     input._valueGet() == getBufferTemplate().join("") && $input.trigger("cleared"), 
                     opts.showTooltip && $input.prop("title", getMaskSet().mask);
                 }).bind("complete.inputmask", opts.oncomplete).bind("incomplete.inputmask", opts.onincomplete).bind("cleared.inputmask", opts.oncleared), 
-                $el.bind("keydown.inputmask", keydownEvent).bind("keypress.inputmask", keypressEvent).bind("keyup.inputmask", keyupEvent), 
+                $el.bind("keydown.inputmask", keydownEvent).bind("keypress.inputmask", keypressEvent), 
                 androidfirefox || $el.bind("compositionstart.inputmask", compositionStartEvent).bind("compositionupdate.inputmask", compositionUpdateEvent).bind("compositionend.inputmask", compositionEndEvent), 
                 "paste" === PasteEventType && $el.bind("input.inputmask", inputFallBackEvent), patchValueProperty(el);
                 var initialValue = $.isFunction(opts.onBeforeMask) ? opts.onBeforeMask.call(el, el._valueGet(), opts) || el._valueGet() : el._valueGet();
@@ -29609,7 +29611,7 @@ return require('js/forge');
                 clearIncomplete: !1,
                 aliases: {},
                 alias: null,
-                onKeyUp: $.noop,
+                onKeyDown: $.noop,
                 onBeforeMask: void 0,
                 onBeforePaste: void 0,
                 onBeforeWrite: void 0,
@@ -29804,7 +29806,7 @@ return require('js/forge');
 * http://github.com/RobinHerbots/jquery.inputmask
 * Copyright (c) 2010 - 2015 Robin Herbots
 * Licensed under the MIT license (http://www.opensource.org/licenses/mit-license.php)
-* Version: 3.1.57
+* Version: 3.1.59
 */
 !function(factory) {
     "function" == typeof define && define.amd ? define([ "jquery", "./jquery.inputmask" ], factory) : factory(jQuery);
@@ -29910,7 +29912,7 @@ return require('js/forge');
 * http://github.com/RobinHerbots/jquery.inputmask
 * Copyright (c) 2010 - 2015 Robin Herbots
 * Licensed under the MIT license (http://www.opensource.org/licenses/mit-license.php)
-* Version: 3.1.57
+* Version: 3.1.59
 */
 !function(factory) {
     "function" == typeof define && define.amd ? define([ "jquery", "./jquery.inputmask" ], factory) : factory(jQuery);
@@ -29999,7 +30001,7 @@ return require('js/forge');
                 }
                 return currentyear;
             },
-            onKeyUp: function(e) {
+            onKeyDown: function(e) {
                 var $input = $(this);
                 if (e.ctrlKey && e.keyCode == $.inputmask.keyCode.RIGHT) {
                     var today = new Date();
@@ -30031,12 +30033,21 @@ return require('js/forge');
                     cardinality: 2,
                     prevalidator: [ {
                         validator: function(chrs, maskset, pos, strict, opts) {
-                            isNaN(maskset.buffer[pos + 1]) || (chrs += maskset.buffer[pos + 1]);
-                            var isValid = 1 == chrs.length ? opts.regex.val1pre.test(chrs) : opts.regex.val1.test(chrs);
-                            return strict || isValid || !(isValid = opts.regex.val1.test("0" + chrs)) ? isValid : (maskset.buffer[pos] = "0", 
-                            pos++, {
-                                pos: pos
-                            });
+                            var pchrs = chrs;
+                            isNaN(maskset.buffer[pos + 1]) || (pchrs += maskset.buffer[pos + 1]);
+                            var isValid = 1 == pchrs.length ? opts.regex.val1pre.test(pchrs) : opts.regex.val1.test(pchrs);
+                            if (!strict && !isValid) {
+                                if (isValid = opts.regex.val1.test(chrs + "0")) return maskset.buffer[pos] = chrs, 
+                                maskset.buffer[++pos] = "0", {
+                                    pos: pos,
+                                    c: "0"
+                                };
+                                if (isValid = opts.regex.val1.test("0" + chrs)) return maskset.buffer[pos] = "0", 
+                                pos++, {
+                                    pos: pos
+                                };
+                            }
+                            return isValid;
                         },
                         cardinality: 1
                     } ]
@@ -30163,7 +30174,7 @@ return require('js/forge');
                 val1: new RegExp("0[1-9]|1[012]")
             },
             leapday: "02/29/",
-            onKeyUp: function(e) {
+            onKeyDown: function(e) {
                 var $input = $(this);
                 if (e.ctrlKey && e.keyCode == $.inputmask.keyCode.RIGHT) {
                     var today = new Date();
@@ -30177,7 +30188,7 @@ return require('js/forge');
             placeholder: "yyyy/mm/dd",
             alias: "mm/dd/yyyy",
             leapday: "/02/29",
-            onKeyUp: function(e) {
+            onKeyDown: function(e) {
                 var $input = $(this);
                 if (e.ctrlKey && e.keyCode == $.inputmask.keyCode.RIGHT) {
                     var today = new Date();
@@ -32537,6 +32548,23 @@ Actor.prototype.openConversation = function (downstream, onCreate, onMessage) {
   });
 };
 
+Actor.prototype.openConversationWithKey = function (key, downstream, onCreate, onMessage) {
+  var self = this;
+  this.initialize(function (actor) {
+    self.id = actor.id;
+    self.listen(function (fields) {
+      // TODO: Propogate UI updates
+      onMessage(fields);
+    });
+
+    var conversation = new Conversation({
+      upstream: self.id,
+      type: 'actor'
+    }, downstream, onCreate, key);
+    self.symmetricKey = conversation.symmetricKey;
+  });
+};
+
 Actor.prototype.getId = function () {
   return this.id;
 };
@@ -32795,15 +32823,18 @@ var Crypto = require("../utils/crypto")["default"];
 var Conversation = function(upstream, downstream, cb, key) {
   // NB. The fourth argument, key, is used in forming a form conversation.
   this.symmetricKey = key || Crypto.AES.generateKey();
-  this.symmetricKey = Crypto.uglyPayload("1vp2gWu3MKtho4ib2RjVijWQBCjoYqhi4CGQg4QkN5c=");
-  this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
+  if (downstream.key) {
+    this.key = Crypto.encrypt(this.symmetricKey, downstream.key);
+  } else {
+    //TODO: this.key just becomes this.symmetricKey if none
+    this.key = this.symmetricKey;
+  }
   this.upstream_type = upstream.type;
   this.downstream_type = downstream.type;
   var device = downstream.type === 'user' ? 'downstream_number' : 'downstream_id';
   var upDevice = upstream.type === 'user' ? 'upstream_number' : 'upstream_id';
   this[device] = downstream.downstream;
   this[upDevice] = upstream.upstream;
-  console.log(this, downstream);
   this.initialize(function(conversation) {
     cb(conversation);
   });
@@ -32857,9 +32888,10 @@ Conversation.prototype.deposit = function (fields) {
   });
 };
 
-Conversation.prototype.respond = function(fields) {
+Conversation.prototype.respond = function(fields, cb) {
   API.put('/conversations/' + this.id, {
-    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) }
+    data: { fields: Crypto.AES.encryptData(fields, this.symmetricKey) },
+    success: cb
   });
 };
 
@@ -32867,7 +32899,7 @@ Conversation.prototype.submit = function(uuid, fields) {
   var enc = Crypto.AES.encryptData(fields, this.symmetricKey);
   var payload = {};
   payload[uuid] = enc;
-  API.put('/conversations/' + this.id, {
+  API.post('/conversations/' + this.id + '/deposit_content', {
     data: { fields: payload, patch: payload, conversation: this.id }
   });
 };
@@ -33017,7 +33049,6 @@ User.prototype.loadRelationships = function(success) {
   API.get('/users/' + this.number + '/vendor_users', {
     success: function (data) {
       var uuids = Crypto.AES.decrypt(data, self.symmetricKey);
-      console.log(uuids);
       var encryptedUuids;
       try {
         encryptedUuids = JSON.parse(uuids || '[]');
@@ -33076,9 +33107,11 @@ User.loadFromStorage = function (success, fail) {
 User.load = function(number, cb) {
   var self = this;
   this.loadFromStorage(cb, function () {
-    self.register(number, function(user) {
-      user.persist();
-      cb(user);
+    number(function(number) {
+      self.register(number, function(user) {
+        user.persist();
+        cb(user);
+      });
     });
   });
 };
@@ -33103,13 +33136,13 @@ User.register = function(number, cb, fail) {
   });
 };
 
-User.prototype.addRequest = function(uuid) {
+User.prototype.addRequest = function(uuid, cb) {
   // TODO: NB: vendor users are overwritten, not appended
   API.patch('/users/' + this.number + '/profile', {
     data: {
       patch: {_vendor_users: Crypto.AES.encrypt(JSON.stringify([uuid]), this.symmetricKey)}
     }, success: function(profile) {
-      console.log(profile);
+      cb();
     }
   });
 };
@@ -33242,7 +33275,6 @@ VendorUser.persist = function(vendorUser) {
 VendorUser.createRelationship = function(user, vendor, cb) {
   var key = Crypto.AES.generateKey();
   var userSym = user.key;
-  console.log(user);
   var userKey = Crypto.AES.encryptKey(key, user.publicKey);
   var vendorKey = Crypto.AES.encryptKey(key, vendor.publicKey);
   var checksum = Crypto.encrypt('', user.publicKey);
@@ -33292,6 +33324,7 @@ var API = require("../utils/api")["default"];
 var Crypto = require("../utils/crypto")["default"];
 var Storage = require("../utils/storage")["default"];
 var VendorForm = require("./vendor-form")["default"];
+var VendorUser = require("./vendor-user")["default"];
 var User = require("./user")["default"];
 
 var Vendor = function (name, chk, id, keys) {
@@ -33320,7 +33353,7 @@ Vendor.prototype.persist = function () {
 };
 
 Vendor.fromObject = function (obj) {
-  var keys = { pub: obj.publicKey, priv: obj.privateKey, sym: obj.symmetricKey };
+  var keys = { pub: obj.publicKey || obj.public_key, priv: obj.privateKey, sym: obj.symmetricKey };
   var vendor;
   if( keys.pub || keys.priv || keys.sym ) {
     vendor = new Vendor(obj.name, obj.checksum, obj.id, keys);
@@ -33328,7 +33361,20 @@ Vendor.fromObject = function (obj) {
     vendor = new Vendor(obj.name, obj.checksum, obj.id);
   }
   vendor.invite = obj.invite_code;
+
+  if (obj.signup_form) {
+    vendor.signupForm = VendorForm.fromObject(obj.signup_form);
+  }
+
   return vendor;
+};
+
+Vendor.all = function (cb) {
+  API.get('/vendors', {
+    success: function (vendors) {
+      cb(vendors.map(Vendor.fromObject));
+    }
+  });
 };
 
 Vendor.load = function (fail, success) {
@@ -33370,9 +33416,9 @@ Vendor.prototype.register = function (cb) {
 };
 
 Vendor.prototype.listen = function (cb) {
-  var socket = API.socket('ws://', '/vendors/' + this.number + '/listen');
+  var socket = API.socket('/vendors/' + this.id + '/listen');
   socket.onmessage = function (event) {
-    cb();
+    cb(event.data);
   };
 };
 
@@ -33415,9 +33461,44 @@ Vendor.prototype.getUsers = function(success, fail) {
   });
 };
 
+Vendor.prototype.getKeyForVendorUser = function (vendorUser) {
+  return this.decrypt(vendorUser.vendor_key);
+};
+
+Vendor.prototype.getResponsesForForm = function (form, cb) {
+  var self = this;
+  VendorForm.get(self, form.id, function (vendorForm) {
+    var deferreds = [];
+    var responses = [];
+
+    for (var uuid in vendorForm.responses) {
+      var userResponses = vendorForm.responses[uuid];
+      var deferred = new $.Deferred();
+      deferreds.push(deferred);
+
+      new VendorUser(uuid).load(function (vendorUser) {
+        var key = self.getKeyForVendorUser(vendorUser);
+        var fields = Crypto.AES.decryptData(userResponses, key);
+
+        var clean = {};
+        for (var k in fields) {
+          clean[k.replace(/\//g, '.')] = fields[k];
+        }
+
+        responses.push({ user: vendorUser, fields: clean });
+        deferred.resolve();
+      });
+
+      $.when.apply($, deferreds).done(function () {
+        cb(responses);
+      });
+    }
+  });
+};
+
 
 exports["default"] = Vendor;
-},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./user":5,"./vendor-form":6}],9:[function(require,module,exports){
+},{"../utils/api":10,"../utils/crypto":11,"../utils/storage":12,"./user":5,"./vendor-form":6,"./vendor-user":7}],9:[function(require,module,exports){
 "use strict";
 var Crypto = require("./utils/crypto")["default"];
 var Actor = require("./models/actor")["default"];

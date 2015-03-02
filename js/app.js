@@ -1,16 +1,17 @@
 /* Handlebars helpers */
 
 function fetch (struct, path) {
-  console.log(struct, path);
   if (path.length == 1) return struct[0][path[0]];
   else return fetch(struct[path[0]], path.slice(1));
 }
 
 Handlebars.registerHelper('buildResponseRow', function(response, fields, options) {
   return fields.reduce(function (acc, field) {
-    var parts = field.identifier.split(':');
-    var path = [parts[0]].concat(parts[1].split('.'));
-    return acc + options.fn({ data: fetch(response, path), identifier: field.identifier });
+    //var parts = field.identifier.split(':');
+    //console.log('parts', parts);
+    //var path = [parts[0]].concat(parts[1].split('.'));
+    //console.log('path', path);
+    return acc + options.fn({ data: response[field.identifier], identifier: field.identifier });
   }, '');
 });
 
@@ -120,7 +121,12 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     var self = this;
     this.vendor.getAllResponses({
       success: function (responses) {
-        self.render(target, responses);
+        Slide.Card.getFlattenedSchemasForFields(responses.fields, function (schemas) {
+          self.render(target, {
+            fields: self.transformFields(schemas),
+            responses: responses.responses
+          });
+        });
       }
     });
   };
@@ -218,7 +224,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     });
   };
 
-  SlideVendor.prototype.promptForNewForm = function () {
+  SlideVendor.prototype.askForForm = function (cb) {
     var self = this;
 
     this.prompt('Input the fields for your forms', ['name', 'description', 'fields'], function (form) {
@@ -227,33 +233,46 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       var fields = form.fields.split(',').map(function (field) {
         return field.trim();
       });
-
-      self.createForm(name, description, fields, function (form) {
-        form.form_fields = form.fields;
-        self.data.forms.push(form);
-        self.updatePage('forms');
-      });
-    })
+      cb(name, description, fields);
+    });
   };
 
-  SlideVendor.prototype.sendFormToUsers = function (form) {
+  SlideVendor.prototype.askForUsers = function (cb) {
     var self = this;
 
     this.prompt('Input the comma separated list of numbers', ['numbers'], function (f) {
       var numbers = f.numbers.split(',').map(function (number) {
         return number.trim();
       });
+      cb(numbers);
+    });
+  };
 
+  SlideVendor.prototype.promptForNewForm = function () { //TODO: rename function to something more appropriate
+    var self = this;
+
+    this.askForForm(function (name, description, fields) {
+      self.createForm(name, description, fields, function (form) {
+        form.form_fields = form.fields;
+        self.data.forms.push(form);
+        self.updatePage('forms');
+      });
+    });
+  };
+
+  SlideVendor.prototype.sendFormToUsers = function (form) {
+    var self = this;
+
+    this.askForUsers(function (numbers) {
       numbers.forEach(function (number) {
         Slide.User.getByIdentifier(new Slide.Identifier.Phone(number), {
           success: function (user) {
-            self.vendor.createRelationship(user, {
+            self.vendor.loadRelationship(user, {
               success: function (relationship) {
                 relationship.createConversation(form.name, {
                   success: function (conversation) {
                     conversation.request(user, form.fields, {
                       success: function () {
-                        console.log('requested from user', user);
                       }
                     });
                   }
@@ -263,8 +282,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
           }
         });
       });
-
-    })
+    });
   };
 
   SlideVendor.prototype.initializeFormListeners = function () {
