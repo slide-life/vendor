@@ -72,3 +72,15 @@ button {
   margin-bottom: 12px;
   border-top: 1px solid $medium-grey;
 }
+
+.field-label {
+  text-transform: capitalize;
+  width: 100px;
+  display: inline-block;
+}
+
+.promptInput, .token-input-list-facebook {
+  display: inline-block;
+  width: 250px !important;
+}
+

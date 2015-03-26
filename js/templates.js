@@ -1,3 +1,5 @@
+this["SlideVendorTemplates"] = this["SlideVendorTemplates"] || {};
+
 Handlebars.registerPartial("account", Handlebars.template({"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
   var helper, functionType="function", helperMissing=helpers.helperMissing, escapeExpression=this.escapeExpression;
   return "You are logged in as <span class=\"name\">"
@@ -78,16 +80,12 @@ Handlebars.registerPartial("users-table", Handlebars.template({"1":function(dept
   return buffer + "  </tbody>\n</table>\n";
 },"usePartial":true,"useData":true,"useDepths":true}));
 
-this["SlideVendorTemplates"] = this["SlideVendorTemplates"] || {};
-
 this["SlideVendorTemplates"]["form"] = Handlebars.template({"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
   var stack1, buffer = "<div class=\"page-control\">\n  <div class=\"filter-controls\">\n    <button class=\"control\"><span class=\"icon icon-filter\"></span>Filter updates</button>\n  </div>\n  <div class=\"download-controls\">\n    <button class=\"control\"><span class=\"icon icon-download-updated\"></span>Download updated</button>\n    <button class=\"control\"><span class=\"icon icon-download\"></span>Download all</button>\n  </div>\n</div>\n";
   stack1 = this.invokePartial(partials['forms-table'], '', 'forms-table', depth0, undefined, helpers, partials, data);
   if (stack1 != null) { buffer += stack1; }
   return buffer;
 },"usePartial":true,"useData":true});
-
-
 
 this["SlideVendorTemplates"]["forms"] = Handlebars.template({"1":function(depth0,helpers,partials,data) {
   var stack1, buffer = "";
@@ -102,8 +100,6 @@ this["SlideVendorTemplates"]["forms"] = Handlebars.template({"1":function(depth0
   if (stack1 != null) { buffer += stack1; }
   return buffer;
 },"usePartial":true,"useData":true});
-
-
 
 this["SlideVendorTemplates"]["users"] = Handlebars.template({"compiler":[6,">= 2.0.0-beta.1"],"main":function(depth0,helpers,partials,data) {
   var stack1, buffer = "<div class=\"page-control\">\n  <div class=\"filter-controls\">\n    <button class=\"control\"><span class=\"icon icon-filter\"></span>Filter updates</button>\n  </div>\n  <div class=\"download-controls\">\n    <button class=\"control\"><span class=\"icon icon-download-updated\"></span>Download updated</button>\n    <button class=\"control\"><span class=\"icon icon-download\"></span>Download all</button>\n  </div>\n</div>\n";

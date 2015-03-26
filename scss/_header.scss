@@ -21,6 +21,12 @@
   background-image: url('../img/logo.svg');
 }
 
+.header .product {
+  float: left;
+  border-left: 1px solid white;
+  padding-left: 7px;
+}
+
 .header .user {
   float: right;
   margin: 0 12px;

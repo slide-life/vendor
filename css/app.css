@@ -62,6 +62,15 @@ button {
   margin-bottom: 12px;
   border-top: 1px solid #C0C0C0; }
 
+.field-label {
+  text-transform: capitalize;
+  width: 100px;
+  display: inline-block; }
+
+.promptInput, .token-input-list-facebook {
+  display: inline-block;
+  width: 250px !important; }
+
 /* Structure */
 /* Colours */
 /* Common properties */
@@ -83,6 +92,11 @@ button {
   height: 32px;
   margin: 12px;
   background-image: url("../img/logo.svg"); }
+
+.header .product {
+  float: left;
+  border-left: 1px solid white;
+  padding-left: 7px; }
 
 .header .user {
   float: right;
