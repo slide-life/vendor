@@ -174,10 +174,21 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     var self = this;
     this.vendor.getAllResponses({
       success: function (responses) {
-        Slide.Card.getFlattenedSchemasForFields(responses.fields, function (schemas) {
+        var leaves = responses.responses.map(getLeaves);
+        var profile = {};
+        leaves.forEach(function (leaf) {
+          Object.keys(leaf).forEach(function (k) {
+            profile[k] = true;
+          });
+        });
+        var fields = Object.keys(profile).map(function (f) {
+          // TODO: check that this implementation matches standard
+          return f.split(':')[1];
+        });
+        Slide.Card.getFlattenedSchemasForFields(fields, function (schemas) {
           self.render(target, {
             fields: self.transformFields(schemas),
-            responses: responses.responses
+            responses: leaves
           });
         });
       }
@@ -226,6 +237,7 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
       var fields = form.fields;
       Slide.Card.getFlattenedSchemasForFields(fields, function (schemas) {
         var leaves = responses.responses.map(getLeaves);
+        console.log('ls', leaves);
         var template = Handlebars.partials['forms-table']({
           fields: self.transformFields(schemas),
           responses: leaves
