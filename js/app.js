@@ -271,6 +271,37 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
     });
   };
 
+  SlideVendor.prototype.getUsers = function (cb) {
+    var self = this;
+    if (this._users) {
+      cb(this._users);
+      return;
+    }
+    var users = [];
+    this.vendor.getRelationships({
+      success: function (rs) {
+        rs.map(function (r) {
+          return r.leftId == self.vendor.id ? r.rightId : r.leftId;
+        }).forEach(function (userId, index, rs) {
+          Slide.User.getById(userId, {
+            success: function (user) {
+              users.push(user);
+              if (users.length == rs.length) {
+                self._users = users.filter(function (x) {
+                  return x !== null;
+                });
+                cb(self._users);
+              }
+            },
+            failure: function (err) {
+              users.push(null);
+            }
+          })
+        });
+      }
+    });
+  };
+
   SlideVendor.prototype.initializeDataTableListeners = function () {
     $(document).on('click', '.data-table tbody td', function () {
       $('.data-table tbody tr').removeClass('selected');
@@ -312,11 +343,20 @@ Handlebars.registerHelper('buildResponseRow', function(response, fields, options
   SlideVendor.prototype.askForUsers = function (cb) {
     var self = this;
 
-    this.prompt('Enter Recipients', [{n:'numbers'}], function (f) {
-      var numbers = f.numbers.split(',').map(function (number) {
-        return number.trim();
+    this.getUsers(function (users) {
+      var userNumbers = users.map(function (user) {
+        console.log('user', user);
+        return user.identifiers.map(function (id) {
+          return id.value;
+        });
+      }).reduce(function (a, b) { return a.concat(b); }, []);
+
+      self.prompt('Enter Recipients', [{n:'numbers', xs:userNumbers}], function (f) {
+        var numbers = f.numbers.split(',').map(function (number) {
+          return number.trim();
+        });
+        cb(numbers);
       });
-      cb(numbers);
     });
   };
 

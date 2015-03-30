@@ -83,4 +83,10 @@ button {
   display: inline-block;
   width: 250px !important;
 }
+.promptInput, .token-input-list-facebook input {
+  border: 1px solid #333;
+  padding: 3px 8px;
+  box-sizing: content-box;
+  outline: none;
+}
 
